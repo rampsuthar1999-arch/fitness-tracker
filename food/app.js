@@ -57,6 +57,15 @@ function day(k, create) {
   if (!S.days[k] && create) S.days[k] = {meals:{breakfast:[],lunch:[],snacks:[],dinner:[]}, water:0};
   return S.days[k];
 }
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const emptyMeals = () => ({breakfast:[],lunch:[],snacks:[],dinner:[]});
+const hasItems = pl => pl && MEALS.some(([m]) => (pl[m] || []).length);
+let planSel = 'all';                                    // 'all' = every day, or a weekday number 0–6
+function curPlan() {
+  if (planSel === 'all') return S.plan;
+  S.week = S.week || {}; S.week[planSel] = S.week[planSel] || emptyMeals(); return S.week[planSel];
+}
+function planFor(k) { const w = S.week && S.week[parseKey(k).getDay()]; return hasItems(w) ? w : S.plan; }
 const allItems = d => d ? MEALS.flatMap(([m]) => d.meals[m] || []) : [];
 function mealNow() {
   const h = new Date().getHours() + new Date().getMinutes() / 60;
@@ -80,10 +89,15 @@ function targets(p) {
   p = p || {sex:'m', age:30, ht:170, wt:70, act:1.375, goal:'keep', diet:'v'};
   const bmr = 10*p.wt + 6.25*p.ht - 5*p.age + (p.sex === 'm' ? 5 : -161);
   const tdee = bmr * p.act;
-  let k = tdee + (p.goal === 'lose' ? -400 : p.goal === 'gain' ? 300 : 0);
-  if (p.goal === 'lose') k = Math.max(k, bmr, p.sex === 'm' ? 1500 : 1200);
+  const cut = p.goal === 'lose' || p.goal === 'recomp';
+  let k = tdee + (p.goal === 'lose' ? -400 : p.goal === 'recomp' ? -650 : p.goal === 'gain' ? 300 : 0);
+  if (cut) k = Math.max(k, bmr, p.sex === 'm' ? 1500 : 1200);
   k = Math.round(k / 10) * 10;
-  const protein = Math.round(p.wt * (p.act >= 1.55 || p.goal === 'gain' ? 1.2 : 1.0));
+  // Protein per kg of "adjusted" body weight (ideal weight at BMI 22.5 + 40% of the extra), so it isn't inflated by body fat.
+  const ideal = 22.5 * (p.ht / 100) ** 2, adj = p.wt > ideal ? ideal + 0.4 * (p.wt - ideal) : p.wt;
+  const lifts = p.act >= 1.55;
+  const perKg = p.goal === 'recomp' || (lifts && p.goal === 'gain') ? 1.5 : lifts ? 1.2 : cut ? 1.1 : 1.0;
+  const protein = Math.round(adj * perKg);
   const fat = Math.round(k * 0.25 / 9);
   const carbs = Math.round((k - protein*4 - fat*9) / 4);
   return {k, p:protein, c:carbs, f:fat, fatMax:Math.round(k*0.30/9), fb:Math.max(25, Math.round(k/1000*15)),
@@ -310,7 +324,7 @@ function renderToday() {
   $('meals').innerHTML = MEALS.map(([m, label]) => {
     const eaten = d ? d.meals[m] : [], et = totals(eaten);
     const eatenIds = new Set(eaten.map(x => x.id));
-    const planned = (S.plan[m] || []).filter(x => !eatenIds.has(x.id) && food(x.id));
+    const planned = (planFor(cur)[m] || []).filter(x => !eatenIds.has(x.id) && food(x.id));
     const rows = eaten.map((it, i) => { const fd = food(it.id); if (!fd) return '';
       return `<div class="item"><div class="nm"><div>${esc(fd.n)}${fd.j ? '<span class="tag j">junk</span>' : ''}</div>
         <div class="small muted">${fmtQ(it.q)} × ${esc(fd.sv)} · ${r0(fd.k*it.q)} kcal · ${r1(fd.p*it.q)} g protein</div></div>
@@ -334,7 +348,14 @@ window.copyYesterday = m => { const y = day(addDays(cur, -1)); day(cur, true).me
 
 /* ======================= RENDER: PLAN ======================= */
 function renderPlan() {
-  const t = T(), all = MEALS.flatMap(([m]) => S.plan[m]), tot = totals(all);
+  const P = curPlan(), t = T(), all = MEALS.flatMap(([m]) => P[m]), tot = totals(all);
+  const tdow = today().getDay();
+  $('planDays').innerHTML = `<div class="chip ${planSel === 'all' ? 'on' : ''}" onclick="setPlanSel('all')">Every day</div>` +
+    [1,2,3,4,5,6,0].map(d => `<div class="chip ${planSel === d ? 'on' : ''}" onclick="setPlanSel(${d})">${DOW[d]}${hasItems(S.week && S.week[d]) ? ' •' : ''}${d === tdow ? ' (today)' : ''}</div>`).join('');
+  setTimeout(() => { const on = $('planDays').querySelector('.chip.on'); if (on) on.scrollIntoView({inline:'center', block:'nearest'}); }, 0);
+  $('planNote').textContent = planSel === 'all'
+    ? 'Used on any day that has no plan of its own. Days marked • have their own plan.'
+    : `${DOW[planSel]}'s plan${hasItems(S.week && S.week[planSel]) ? '' : ' is empty, so the “Every day” plan is used. Add food or suggest a plan for this day.'}`;
   $('planTotals').innerHTML = all.length ? `
     <table>
       <tr><td>Calories</td><td>${r0(tot.k)} / ${t.k} kcal</td></tr>
@@ -346,17 +367,18 @@ function renderPlan() {
     </table>${tot.na > t.na ? `<div class="tip">🧂 Home-cooked food usually has more salt than the 5 g/day limit. Cook with light salt and skip pickle, papad and salted chaas to stay under ${t.na} mg.</div>` : ''}`
     : '<p class="small muted">No plan yet. Tap “Suggest a healthy plan” to get one built for your targets, then change anything you like.</p>';
   $('planMeals').innerHTML = MEALS.map(([m, label]) => {
-    const rows = S.plan[m].map((it, i) => { const fd = food(it.id); if (!fd) return '';
+    const rows = P[m].map((it, i) => { const fd = food(it.id); if (!fd) return '';
       return `<div class="item"><div class="nm"><div>${esc(fd.n)}</div>
         <div class="small muted">${fmtQ(it.q)} × ${esc(fd.sv)} · ${r0(fd.k*it.q)} kcal · ${r1(fd.p*it.q)} g protein</div></div>
         <button class="iconbtn" onclick="planQ('${m}',${i},-0.5)">−</button><button class="iconbtn" onclick="planQ('${m}',${i},0.5)">+</button>
         <button class="iconbtn" onclick="planDel('${m}',${i})">🗑</button></div>`; }).join('');
-    return `<div class="card meal"><h3><span>${label} <span class="small muted">${S.plan[m].length ? r0(totals(S.plan[m]).k) + ' kcal' : ''}</span></span>
+    return `<div class="card meal"><h3><span>${label} <span class="small muted">${P[m].length ? r0(totals(P[m]).k) + ' kcal · ' + r0(totals(P[m]).p) + ' g protein' : ''}</span></span>
       <button class="btn sm" onclick="openAdd('plan','${m}')">+ Add</button></h3>${rows || '<div class="small muted">Nothing planned</div>'}</div>`;
   }).join('');
 }
-window.planQ = (m, i, dq) => { const it = S.plan[m][i]; it.q = Math.max(0.5, it.q + dq); save(); renderAll(); };
-window.planDel = (m, i) => { S.plan[m].splice(i, 1); save(); renderAll(); };
+window.setPlanSel = d => { planSel = d; renderPlan(); };
+window.planQ = (m, i, dq) => { const it = curPlan()[m][i]; it.q = Math.max(0.5, it.q + dq); save(); renderAll(); };
+window.planDel = (m, i) => { curPlan()[m].splice(i, 1); save(); renderAll(); };
 
 // Balanced Indian day templates (ICMR "My Plate" style), scaled to your calories.
 const TEMPLATES = [
@@ -408,7 +430,8 @@ function suggestPlan() {
   let tp = totals(flat()).p;
   if (tp < t.p * 0.9) { plan.snacks.push({id:'greek-yogurt-hung-curd', q:1}); tp += 9; }
   if (tp < t.p * 0.9) plan.lunch.push({id: p.diet === 'v' ? 'moong-sprouts-salad' : 'boiled-egg', q: p.diet === 'v' ? 1 : 2});
-  S.plan = plan; save(); renderAll();
+  if (planSel === 'all') S.plan = plan; else { S.week = S.week || {}; S.week[planSel] = plan; }
+  save(); renderAll();
 }
 
 /* ======================= RENDER: INSIGHTS ======================= */
@@ -552,7 +575,7 @@ function renderTargets() {
       <tr><td>🍌 Fruit</td><td>${t.fg} g+ (1–2 fruits)</td></tr>
       <tr><td>💧 Water</td><td>${t.water} glasses</td></tr>
     </table>
-    <p class="small muted">BMI ${r1(bmi)} — ${bmiTxt}. Maintenance ≈ ${t.tdee} kcal/day${p.goal === 'lose' ? '; you eat ~400 less to lose about ⅓ kg a week' : p.goal === 'gain' ? '; you eat ~300 more to support muscle gain with your gym training' : ''}.</p>
+    <p class="small muted">BMI ${r1(bmi)} — ${bmiTxt}. Maintenance ≈ ${t.tdee} kcal/day${p.goal === 'lose' ? '; you eat ~400 less to lose about ⅓ kg a week' : p.goal === 'recomp' ? '; you eat ~650 less to lose about ½–¾ kg a week, while high protein + gym helps build muscle' : p.goal === 'gain' ? '; you eat ~300 more to support muscle gain with your gym training' : ''}.</p>
     <div class="tip">🍽️ ICMR plate rule: half the plate vegetables + fruit, a quarter whole grains/millets, a quarter dal/paneer/curd${p.diet !== 'v' ? '/egg' : ''}${p.diet === 'n' ? '/chicken/fish' : ''}. Limit fried food, sweets, packaged snacks and sugary drinks.</div>`;
 }
 $('saveProfile').onclick = () => {
@@ -568,7 +591,7 @@ $('saveProfile').onclick = () => {
 let addMode = 'day', addMeal = 'breakfast', addGroup = 'All', picked = null, pickQ = 1, tileKey = null, gridKind = null;
 function addItem(mode, meal, id, q) {
   const it = {id, q};
-  if (mode === 'plan') S.plan[meal].push(it);
+  if (mode === 'plan') curPlan()[meal].push(it);
   else { const arr = day(cur, true).meals[meal]; const ex = arr.find(x => x.id === id); if (ex) ex.q += q; else arr.push(it); }
   S.recent = [id, ...S.recent.filter(x => x !== id)].slice(0, 12);
   save(); renderAll();
@@ -663,7 +686,34 @@ $('dNext').onclick = () => { cur = addDays(cur, 1); renderAll(); };
 $('mPrev').onclick = () => { calView.setMonth(calView.getMonth() - 1); renderInsights(); };
 $('mNext').onclick = () => { calView.setMonth(calView.getMonth() + 1); renderInsights(); };
 $('suggestBtn').onclick = () => { suggestPlan(); toast('New plan suggested'); };
-$('clearPlan').onclick = () => { MEALS.forEach(([m]) => S.plan[m] = []); save(); renderAll(); };
+$('clearPlan').onclick = () => { const P = curPlan(); MEALS.forEach(([m]) => P[m] = []); save(); renderAll(); };
+
+/* Family weekly menu: same dishes for everyone, portion size picked from each person's calorie target. */
+function menuFor(person) {
+  const keep = S; S = person; const k = T().k; S = keep;
+  const tier = k < 1650 ? 0 : k < 2400 ? 1 : 2;
+  const week = {};
+  MENU_DAYS.forEach(d => {
+    week[d] = emptyMeals();
+    MEALS.forEach(([m]) => (FAMILY_MENU[d][m] || []).concat(MENU_DAILY_EXTRAS[m] || []).forEach(([id, q]) => {
+      if (!(q[tier] > 0 && food(id))) return;
+      // an extra roti joins whatever roti that meal already has (jowar, bajra…)
+      const ex = week[d][m].find(x => x.id === id) || (food(id).t === 'roti' && week[d][m].find(x => food(x.id).t === 'roti'));
+      if (ex) ex.q += q[tier]; else week[d][m].push({id, q:q[tier]});
+    }));
+  });
+  return {week, tier};
+}
+$('familyMenuBtn').onclick = () => {
+  const btn = $('familyMenuBtn');
+  if (!btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Tap again: replaces Mon–Sun plans for everyone'; setTimeout(() => { delete btn.dataset.sure; btn.textContent = '🍽️ Load family weekly menu'; }, 4000); return; }
+  delete btn.dataset.sure; btn.textContent = '🍽️ Load family weekly menu';
+  const done = [];
+  ROOT.order.forEach(id => { const p = ROOT.people[id]; if (!p.profile) return;
+    const {week, tier} = menuFor(p); p.week = week; done.push(`${p.name} (${['small','medium','large'][tier]})`); });
+  save(); planSel = today().getDay(); renderAll();
+  toast(done.length ? `Weekly menu loaded: ${done.join(', ')}` : 'Set up profiles first');
+};
 $('exportBtn').onclick = () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(ROOT, null, 1)], {type:'application/json'}));

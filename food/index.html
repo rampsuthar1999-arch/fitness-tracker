@@ -128,7 +128,7 @@
   .qty b{font-size:1.4rem;min-width:60px;text-align:center}
   .tip{background:var(--card2);border-left:3px solid var(--accent);padding:8px 10px;border-radius:8px;font-size:.82rem;margin:6px 0}
   .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#14532d;color:#dcfce7;
-         padding:8px 14px;border-radius:20px;font-size:.84rem;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+         padding:8px 14px;border-radius:16px;font-size:.84rem;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
   .toast.on{opacity:1}
 </style>
 </head>
@@ -177,8 +177,11 @@
   <!-- ============ PLAN ============ -->
   <section class="tab" id="tab-plan">
     <div class="card">
-      <h3>📋 What I should eat (my daily plan)</h3>
-      <p class="small muted" style="margin-top:-4px">This plan shows on every day in the Today tab. Tap ✓ there when you eat it.</p>
+      <h3>📋 What to eat — meal plan</h3>
+      <p class="small muted" style="margin-top:-4px">The plan for each day shows in the Today tab. Tap ✓ there when you eat it.</p>
+      <button class="btn" id="familyMenuBtn" style="width:100%;margin-bottom:10px;background:#a78bfa;color:#1e1036">🍽️ Load family weekly menu</button>
+      <div class="chips" id="planDays"></div>
+      <p class="small muted" id="planNote" style="margin:4px 0 10px"></p>
       <div class="row wrap">
         <button class="btn" id="suggestBtn">✨ Suggest a healthy plan</button>
         <button class="btn ghost sm" id="clearPlan">Clear plan</button>
@@ -231,7 +234,7 @@
       </select>
       <div class="grid2">
         <div><label>Goal</label><select id="pGoal">
-          <option value="lose">Lose fat slowly</option><option value="keep">Stay the same</option><option value="gain">Gain muscle</option></select></div>
+          <option value="lose">Lose fat slowly (~⅓ kg/week)</option><option value="recomp">Lose fat + build muscle (~½–¾ kg/week)</option><option value="keep">Stay the same</option><option value="gain">Gain muscle</option></select></div>
         <div><label>Food preference</label><select id="pDiet">
           <option value="v">Vegetarian</option><option value="e">Veg + eggs</option><option value="n">Non-vegetarian</option></select></div>
       </div>
@@ -311,6 +314,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="foods.js"></script>
+<script src="menu.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

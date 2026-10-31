@@ -76,6 +76,9 @@ const FOOD_RAW = [
 ["Moong dal chilla","1",130,8,17,3.5,3,0,200,"Dal & pulses","v",20,0,0,1.4,25,4,"pyaz",""],
 ["Soya chunks curry","1 katori",200,18,14,8,5,0,450,"Dal & pulses","v",30,0,0,4,80,4,"tamatar",""],
 ["Tofu bhurji","1 katori",200,15,6,13,2,0,400,"Dal & pulses","v",30,0,0,2.5,250,8,"pyaz,shimla mirch",""],
+["Chana chaat (boiled kabuli chana)","1 bowl",180,9,27,3.5,7.5,0,300,"Dal & pulses","v",40,0,0,2.5,50,10,"pyaz,tamatar,kheera",""],
+["Paneer tikka (grilled)","100 g paneer + veg",300,20,8,21,2,0,500,"Dairy","v",50,0,0,0.8,480,40,"shimla mirch,pyaz",""],
+["Ragi dosa","1",150,4,26,3.5,3,0,250,"Rice & breakfast","v",0,0,0,1.2,100,0,"",""],
 ["Dhokla","2 pieces",150,6,22,4,2,4,400,"Dal & pulses","v",0,0,0,1.2,20,1,"",""],
 // ---------- Vegetables (cooked sabzi ≈ 1 katori, 1–2 tsp oil) ----------
 ["Mixed veg sabzi","1 katori (150 g)",130,3,14,7,4,0,400,"Vegetables","v",130,0,0,1,45,20,"gajar,beans,matar,gobi",""],
