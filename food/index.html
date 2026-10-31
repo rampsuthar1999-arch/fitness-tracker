@@ -116,6 +116,9 @@
   .chips{display:flex;gap:6px;overflow-x:auto;padding:6px 0;flex:none}
   .chip{flex:none;background:var(--card2);border:1px solid var(--line);border-radius:20px;padding:6px 12px;font-size:.8rem;cursor:pointer}
   .chip.on{background:var(--accent);color:#06202e;border-color:var(--accent);font-weight:700}
+  .people{margin:-4px 0 10px;justify-content:center}
+  .chip.person{font-size:.88rem;padding:7px 14px}
+  .chip.person.on{background:#a78bfa;border-color:#a78bfa;color:#1e1036}
   .pgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;overflow:auto;padding:4px 0}
   .pk{background:var(--card2);border-radius:12px;padding:10px 4px;text-align:center;cursor:pointer;font-size:.72rem}
   .pk b{display:block;font-size:1.5rem;font-weight:400;margin-bottom:3px}
@@ -131,7 +134,8 @@
 </head>
 <body>
 <main>
-  <h1>🥗 Food Tracker</h1>
+  <h1>🥗 Food Tracker<span id="who"></span></h1>
+  <div class="chips people" id="people"></div>
 
   <!-- ============ TODAY ============ -->
   <section class="tab on" id="tab-today">
@@ -142,7 +146,7 @@
     </div>
 
     <div class="card" id="setupNote" style="display:none">
-      <b>👋 Start by filling in your profile</b>
+      <b>👋 Set up this person's profile first</b>
       <p class="small muted">Your ideal daily amounts are worked out from your age, weight, height, activity and goal.</p>
       <button class="btn" onclick="showTab('profile')">Set up profile</button>
     </div>
@@ -186,6 +190,7 @@
 
   <!-- ============ INSIGHTS ============ -->
   <section class="tab" id="tab-insights">
+    <div class="card" id="familyCard" style="display:none"></div>
     <div class="card">
       <div class="datenav" style="margin-bottom:8px"><button id="mPrev">‹</button><b id="mLabel"></b><button id="mNext">›</button></div>
       <div class="cal" id="cal"></div>
@@ -207,8 +212,11 @@
   <!-- ============ PROFILE ============ -->
   <section class="tab" id="tab-profile">
     <div class="card">
-      <h3>👤 About you</h3>
+      <h3>👤 Profile</h3>
       <div class="grid2">
+        <div><label>Name</label><input id="pName" maxlength="20" placeholder="e.g. Mummy"></div>
+        <div><label>Icon</label><select id="pEmoji">
+          <option>🙂</option><option>👩</option><option>👨</option><option>👵</option><option>👴</option><option>🧑</option><option>👧</option><option>👦</option><option>💪</option><option>🌸</option></select></div>
         <div><label>Sex</label><select id="pSex"><option value="m">Male</option><option value="f">Female</option></select></div>
         <div><label>Age (years)</label><input id="pAge" type="number" inputmode="numeric" min="14" max="100"></div>
         <div><label>Height (cm)</label><input id="pHt" type="number" inputmode="decimal" min="120" max="230"></div>
@@ -227,12 +235,13 @@
         <div><label>Food preference</label><select id="pDiet">
           <option value="v">Vegetarian</option><option value="e">Veg + eggs</option><option value="n">Non-vegetarian</option></select></div>
       </div>
-      <button class="btn" id="saveProfile" style="margin-top:14px;width:100%">Save &amp; calculate my targets</button>
+      <button class="btn" id="saveProfile" style="margin-top:14px;width:100%">Save &amp; calculate targets</button>
+      <button class="btn ghost sm" id="removePerson" style="margin-top:10px;color:#fca5a5;border-color:#7f1d1d">Remove</button>
     </div>
     <div class="card" id="targetCard"></div>
     <div class="card">
       <h3>💾 Backup</h3>
-      <p class="small muted">Your data is stored on this phone only. Export a backup now and then.</p>
+      <p class="small muted">Everyone's data is stored on this phone only. Export a backup now and then — it includes the whole family.</p>
       <div class="row"><button class="btn ghost sm" id="exportBtn">Export backup</button>
         <button class="btn ghost sm" id="importBtn">Import backup</button>
         <input type="file" id="importFile" accept="application/json" hidden></div>

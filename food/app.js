@@ -12,11 +12,31 @@ const NUTR = ['k','p','c','f','fb','s','na','fe','ca','vc','vg','fg','j'];
 
 /* ======================= STATE ======================= */
 const KEY = 'foodTracker.v1';
-let S;
-try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
-S = Object.assign({profile:null, plan:{breakfast:[],lunch:[],snacks:[],dinner:[]}, days:{}, custom:[], recent:[], quick:{}}, S || {});
-S.quick = S.quick || {};
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+/* Family: ROOT holds every person; S is the person currently selected.
+   Custom foods and recently used foods are shared by the whole family. */
+const emptyPerson = (name, emoji) => ({name, emoji, profile:null, plan:{breakfast:[],lunch:[],snacks:[],dinner:[]}, days:{}, quick:{}});
+let ROOT, S;
+function loadRoot(raw) {
+  let r = raw;
+  if (!r || !r.people) {                       // old single-person format → becomes "Me"
+    const me = Object.assign(emptyPerson('Me', '🙂'), r ? {profile:r.profile, plan:r.plan || emptyPerson().plan, days:r.days || {}, quick:r.quick || {}, suggestN:r.suggestN} : {});
+    r = {people:{me}, order:['me'], active:'me', custom:(r && r.custom) || [], recent:(r && r.recent) || []};
+    r.people.mother = emptyPerson('Mother', '👩'); r.people.father = emptyPerson('Father', '👨'); r.order.push('mother', 'father');
+  }
+  r.custom = r.custom || []; r.recent = r.recent || [];
+  r.order = (r.order || Object.keys(r.people)).filter(id => r.people[id]);
+  if (!r.people[r.active]) r.active = r.order[0];
+  r.order.forEach(id => {
+    const p = r.people[id];
+    p.quick = p.quick || {}; p.days = p.days || {}; p.plan = p.plan || emptyPerson().plan;
+    Object.defineProperty(p, 'custom', {get: () => ROOT.custom, set: v => ROOT.custom = v, enumerable: false, configurable: true});
+    Object.defineProperty(p, 'recent', {get: () => ROOT.recent, set: v => ROOT.recent = v, enumerable: false, configurable: true});
+  });
+  ROOT = r; S = r.people[r.active];
+}
+try { loadRoot(JSON.parse(localStorage.getItem(KEY))); } catch (e) { loadRoot(null); }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(ROOT)); } catch (e) {} };
+save();
 const food = id => FOODS[id] || S.custom.find(c => c.id === id);
 
 const pad = n => String(n).padStart(2, '0');
@@ -53,7 +73,7 @@ function pieces(f) {
 /* ======================= TARGETS =======================
    Calories: Mifflin-St Jeor BMR × activity, ± goal (gentle, never below a safe floor).
    ICMR-NIN 2024 guidelines: fat ≤ 30% of calories, salt < 5 g/day, free sugar ≤ 5% of calories,
-   vegetables ≥ 400 g + fruit ≥ 100 g. ICMR-NIN 2020 RDAs: iron 19 mg (men) / 29 mg (women),
+   vegetables ≥ 400 g + fruit ≥ 100 g. ICMR-NIN 2020 RDAs: iron 19 mg (men, women 50+) / 29 mg (women),
    calcium 1000 mg, vitamin C 80 mg (men) / 65 mg (women).
    Protein 1.0 g/kg (1.2 g/kg if training most days). Fibre 15 g per 1000 kcal. */
 function targets(p) {
@@ -67,7 +87,7 @@ function targets(p) {
   const fat = Math.round(k * 0.25 / 9);
   const carbs = Math.round((k - protein*4 - fat*9) / 4);
   return {k, p:protein, c:carbs, f:fat, fatMax:Math.round(k*0.30/9), fb:Math.max(25, Math.round(k/1000*15)),
-          s:Math.round(k*0.05/4), na:2000, vg:400, fg:100, fe:p.sex === 'f' ? 29 : 19, ca:1000, vc:p.sex === 'f' ? 65 : 80,
+          s:Math.round(k*0.05/4), na:2000, vg:400, fg:100, fe:p.sex === 'f' && p.age < 50 ? 29 : 19, ca:1000, vc:p.sex === 'f' ? 65 : 80,
           water:Math.max(8, Math.round(p.wt*35/250)), tdee:Math.round(tdee)};
 }
 const T = () => targets(S.profile);
@@ -404,6 +424,7 @@ function lastDays(n, includeToday) {
   return out;
 }
 function renderInsights() {
+  renderFamily();
   // calendar
   $('mLabel').textContent = calView.toLocaleDateString(undefined, {month:'long', year:'numeric'});
   const first = (calView.getDay() + 6) % 7, n = new Date(calView.getFullYear(), calView.getMonth() + 1, 0).getDate(), tk = keyOf(today());
@@ -507,6 +528,9 @@ function loadProfile() {
   const p = S.profile || {sex:'m', age:'', ht:'', wt:'', act:1.55, goal:'keep', diet:'v'};
   $('pSex').value = p.sex; $('pAge').value = p.age; $('pHt').value = p.ht; $('pWt').value = p.wt;
   $('pAct').value = String(p.act); $('pGoal').value = p.goal; $('pDiet').value = p.diet;
+  $('pName').value = S.name; $('pEmoji').value = S.emoji;
+  $('removePerson').style.display = ROOT.order.length > 1 ? 'inline-block' : 'none';
+  $('removePerson').textContent = `Remove ${S.name}`;
 }
 function renderTargets() {
   if (!S.profile) { $('targetCard').innerHTML = '<h3>🎯 Your ideal daily amounts</h3><p class="small muted">Fill in the form above to see them.</p>'; return; }
@@ -536,7 +560,8 @@ $('saveProfile').onclick = () => {
              act:+$('pAct').value, goal:$('pGoal').value, diet:$('pDiet').value};
   if (!(p.age >= 14 && p.age <= 100 && p.ht >= 120 && p.ht <= 230 && p.wt >= 30 && p.wt <= 250)) {
     $('targetCard').innerHTML = '<p style="color:var(--bad)">Please enter a valid age, height (cm) and weight (kg).</p>'; return; }
-  S.profile = p; save(); renderAll(); toast('Profile saved'); $('targetCard').scrollIntoView({behavior:'smooth'});
+  S.name = $('pName').value.trim() || S.name; S.emoji = $('pEmoji').value;
+  S.profile = p; save(); loadProfile(); renderAll(); toast(`${S.name}'s profile saved`); $('targetCard').scrollIntoView({behavior:'smooth'});
 };
 
 /* ======================= ADD-FOOD SHEET ======================= */
@@ -641,15 +666,66 @@ $('suggestBtn').onclick = () => { suggestPlan(); toast('New plan suggested'); };
 $('clearPlan').onclick = () => { MEALS.forEach(([m]) => S.plan[m] = []); save(); renderAll(); };
 $('exportBtn').onclick = () => {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 1)], {type:'application/json'}));
-  a.download = `food-tracker-backup-${keyOf(today())}.json`; a.click();
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(ROOT, null, 1)], {type:'application/json'}));
+  a.download = `family-food-backup-${keyOf(today())}.json`; a.click();
 };
 $('importBtn').onclick = () => $('importFile').click();
 $('importFile').onchange = e => { const f = e.target.files[0]; if (!f) return;
-  f.text().then(t => { try { const imp = JSON.parse(t); if (imp && imp.days) { S = Object.assign(S, imp); save(); loadProfile(); renderAll(); toast('Backup restored'); } } catch (err) { toast('Could not read that file'); } }); };
+  f.text().then(t => { try { const imp = JSON.parse(t); if (imp && imp.people) { loadRoot(imp); save(); loadProfile(); renderAll(); toast('Family backup restored'); }
+    else if (imp && imp.days) { Object.assign(S, {profile:imp.profile, plan:imp.plan, days:imp.days, quick:imp.quick || {}}); (imp.custom || []).forEach(c => { if (!food(c.id)) ROOT.custom.push(c); }); save(); loadProfile(); renderAll(); toast('Backup restored for ' + S.name); } } catch (err) { toast('Could not read that file'); } }); };
+
+/* ======================= FAMILY ======================= */
+function renderPeople() {
+  $('people').innerHTML = ROOT.order.map(id => { const p = ROOT.people[id];
+      return `<div class="chip person ${id === ROOT.active ? 'on' : ''}" onclick="switchPerson('${id}')">${p.emoji} ${esc(p.name)}</div>`; }).join('') +
+    `<div class="chip person" onclick="addPerson()">＋ Add</div>`;
+  document.title = `${S.name} · Food Tracker`;
+  $('who').textContent = ROOT.order.length > 1 ? ` — ${S.emoji} ${S.name}` : '';
+}
+window.switchPerson = id => {
+  if (id === ROOT.active) return;
+  ROOT.active = id; S = ROOT.people[id]; save(); qMeal = mealNow();
+  loadProfile();
+  if (!S.profile) showTab('profile'); else renderAll();
+  toast(`Now tracking ${S.emoji} ${S.name}`);
+};
+window.addPerson = () => {
+  const id = 'p' + Date.now();
+  ROOT.people[id] = emptyPerson(`Person ${ROOT.order.length + 1}`, '🧑'); ROOT.order.push(id);
+  loadRoot(ROOT); save(); switchPerson(id);
+  setTimeout(() => { $('pName').focus(); $('pName').select(); }, 100);
+};
+$('removePerson').onclick = () => {
+  if (ROOT.order.length < 2) return;
+  const btn = $('removePerson');
+  if (!btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = `Tap again to delete all of ${S.name}'s data`; setTimeout(() => { delete btn.dataset.sure; loadProfile(); }, 4000); return; }
+  delete btn.dataset.sure;
+  const gone = S.name;
+  delete ROOT.people[ROOT.active]; ROOT.order = ROOT.order.filter(x => x !== ROOT.active);
+  ROOT.active = ROOT.order[0]; S = ROOT.people[ROOT.active]; save(); loadProfile(); renderAll(); toast(`Removed ${gone}`);
+};
+function renderFamily() {
+  if (ROOT.order.length < 2) { $('familyCard').style.display = 'none'; return; }
+  $('familyCard').style.display = 'block';
+  const keep = S, days = lastDays(7, false);
+  const rows = ROOT.order.map(id => {
+    S = ROOT.people[id];
+    const evs = days.map(evaluate).filter(Boolean), t = T();
+    const c = {good:0, ok:0, bad:0}; evs.forEach(e => c[e.rating]++);
+    const avg = f => evs.length ? evs.reduce((a, e) => a + e.tot[f], 0) / evs.length : 0;
+    const td = evaluate(keyOf(today()));
+    return `<tr onclick="switchPerson('${id}')" style="cursor:pointer"><td>${S.emoji} <b>${esc(S.name)}</b>
+        <div class="small muted">${evs.length ? `💚${c.good} 🟠${c.ok} 🔴${c.bad} · protein ${r0(avg('p'))}/${t.p} g · veg ${r0(avg('vg'))} g` : (S.profile ? 'No full days logged yet' : 'Profile not set up')}</div></td>
+      <td>${evs.length ? r0(evs.reduce((a, e) => a + e.s, 0) / evs.length) : '–'}<div class="small muted">today ${td ? td.s : '–'}</div></td></tr>`;
+  }).join('');
+  S = keep;
+  $('familyCard').innerHTML = `<h3>👨‍👩‍👦 Family — last 7 days</h3><table><tr><td class="small muted">Person</td><td class="small muted">Avg score</td></tr>${rows}</table>
+    <p class="small muted" style="margin-bottom:0">Tap a name to switch to that person.</p>`;
+}
 
 function activeTab() { const t = document.querySelector('.tab.on'); return t ? t.id.slice(4) : 'today'; }
 function renderAll() {
+  renderPeople();
   const a = activeTab();
   if (a === 'today') renderToday(); else if (a === 'plan') renderPlan(); else if (a === 'insights') renderInsights(); else renderTargets();
 }
