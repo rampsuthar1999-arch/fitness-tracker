@@ -101,7 +101,7 @@ function targets(p) {
   const fat = Math.round(k * 0.25 / 9);
   const carbs = Math.round((k - protein*4 - fat*9) / 4);
   return {k, p:protein, c:carbs, f:fat, fatMax:Math.round(k*0.30/9), fb:Math.max(25, Math.round(k/1000*15)),
-          s:Math.round(k*0.05/4), na:2000, vg:400, fg:100, fe:p.sex === 'f' && p.age < 50 ? 29 : 19, ca:1000, vc:p.sex === 'f' ? 65 : 80,
+          s:(p.cond && p.cond.dm) ? 10 : Math.round(k*0.05/4), na:(p.cond && p.cond.bp) ? 1500 : 2000, vg:400, fg:100, fe:p.sex === 'f' && p.age < 50 ? 29 : 19, ca:1000, vc:p.sex === 'f' ? 65 : 80,
           water:Math.max(8, Math.round(p.wt*35/250)), tdee:Math.round(tdee)};
 }
 const T = () => targets(S.profile);
@@ -156,6 +156,11 @@ function evaluate(k) {
     if ((d.water || 0) < t.water*0.6) pen(5, `Drank little water: ${d.water || 0} of ${t.water} glasses`);
     const vegKinds = Object.keys(tot.prod).filter(p => !isFruit(p)).length;
     if (vegKinds >= 4) good.push(`Good variety: ${vegKinds} different vegetables`);
+  }
+  if (S.profile && S.profile.cond && S.profile.cond.dm) {
+    const refined = allItems(d).filter(it => { const f = food(it.id); return f && (/white rice|jeera rice|naan|white bread|biscuit|pizza|burger|cornflakes|noodles|pasta|bhatura|puri|cake/i.test(f.n)); })
+                               .reduce((a, it) => a + it.q, 0);
+    if (refined > 1.5) pen(8, `Blood sugar: ${r1(refined)} servings of white rice/maida — swap for millets, brown rice, whole wheat`);
   }
   if (tot.s > t.s*2) pen(20, `Way too much sugar: ${r0(tot.s)} g (limit ${t.s} g)`);
   else if (tot.s > t.s) pen(10, `Sugar over limit: ${r0(tot.s)} g (limit ${t.s} g)`);
@@ -282,6 +287,7 @@ function renderToday() {
   $('setupNote').style.display = S.profile ? 'none' : 'block';
   const d = day(cur), t = T(), tot = totals(allItems(d)), ev = evaluate(cur);
   renderTiles();
+  renderReminders();
 
   if (ev) {
     $('scoreNum').textContent = ev.s;
@@ -552,6 +558,7 @@ function loadProfile() {
   $('pSex').value = p.sex; $('pAge').value = p.age; $('pHt').value = p.ht; $('pWt').value = p.wt;
   $('pAct').value = String(p.act); $('pGoal').value = p.goal; $('pDiet').value = p.diet;
   $('pName').value = S.name; $('pEmoji').value = S.emoji;
+  const c = p.cond || {}; $('cDm').checked = !!c.dm; $('cThy').checked = !!c.thy; $('cBp').checked = !!c.bp;
   $('removePerson').style.display = ROOT.order.length > 1 ? 'inline-block' : 'none';
   $('removePerson').textContent = `Remove ${S.name}`;
 }
@@ -580,7 +587,8 @@ function renderTargets() {
 }
 $('saveProfile').onclick = () => {
   const p = {sex:$('pSex').value, age:+$('pAge').value, ht:+$('pHt').value, wt:+$('pWt').value,
-             act:+$('pAct').value, goal:$('pGoal').value, diet:$('pDiet').value};
+             act:+$('pAct').value, goal:$('pGoal').value, diet:$('pDiet').value,
+             cond:{dm:$('cDm').checked, thy:$('cThy').checked, bp:$('cBp').checked}};
   if (!(p.age >= 14 && p.age <= 100 && p.ht >= 120 && p.ht <= 230 && p.wt >= 30 && p.wt <= 250)) {
     $('targetCard').innerHTML = '<p style="color:var(--bad)">Please enter a valid age, height (cm) and weight (kg).</p>'; return; }
   S.name = $('pName').value.trim() || S.name; S.emoji = $('pEmoji').value;
@@ -702,6 +710,12 @@ function menuFor(person) {
       if (ex) ex.q += q[tier]; else week[d][m].push({id, q:q[tier]});
     }));
   });
+  // thyroid tablet: keep dairy / soya out of breakfast (≥4 h from the morning tablet) → move to lunch
+  if (person.profile && person.profile.cond && person.profile.cond.thy) MENU_DAYS.forEach(d => {
+    const b = week[d].breakfast, move = b.filter(it => { const f = food(it.id); return f && (f.g === 'Dairy' || /soya|tofu/i.test(f.n)); });
+    week[d].breakfast = b.filter(it => !move.includes(it));
+    move.forEach(it => { const ex = week[d].lunch.find(x => x.id === it.id); if (ex) ex.q += it.q; else week[d].lunch.push(it); });
+  });
   return {week, tier};
 }
 $('familyMenuBtn').onclick = () => {
@@ -777,9 +791,107 @@ function activeTab() { const t = document.querySelector('.tab.on'); return t ? t
 function renderAll() {
   renderPeople();
   const a = activeTab();
-  if (a === 'today') renderToday(); else if (a === 'plan') renderPlan(); else if (a === 'insights') renderInsights(); else renderTargets();
+  if (a === 'today') renderToday(); else if (a === 'plan') renderPlan(); else if (a === 'insights') renderInsights(); else if (a === 'guide') renderGuide(); else renderTargets();
 }
 loadProfile();
 if (!S.profile) showTab('profile'); else renderAll();
 
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+
+
+/* ======================= GUIDE & REMINDERS ======================= */
+function renderReminders() {
+  const p = S.profile, c = (p && p.cond) || {}, isToday = cur === keyOf(today()), h = new Date().getHours();
+  const r = [];
+  if (isToday && c.thy && h < 12) r.push('💊 <b>Thyroid tablet first</b> — empty stomach with water; wait 30–60 min before tea/breakfast. Keep milk, curd, soya & calcium/iron tablets 4 hours away.');
+  if (c.dm) r.push('🚶 <b>Walk 10 minutes after lunch and dinner</b> — it lowers the blood-sugar spike. No sugar in tea; rice only in the planned amount.');
+  if (c.bp) r.push('🧂 <b>Low salt today</b> — under ¾ tsp total. No pickle, papad, namkeen or salted chaas.');
+  if (p && p.goal === 'recomp' && p.act >= 1.55) r.push('🏋️ <b>Gym day?</b> Whey (or milk + hung curd) within 1–2 hours after training. Aim for 8–10k steps either way.');
+  $('remind').style.display = r.length ? 'block' : 'none';
+  $('remind').innerHTML = '<h3>⏰ Reminders for ' + esc(S.name) + '</h3>' + r.map(x => `<div class="tip">${x}</div>`).join('');
+}
+
+function renderGuide() {
+  const p = S.profile;
+  if (!p) { $('guide').innerHTML = `<div class="card"><h3>📘 Guide for ${esc(S.name)}</h3><p class="small muted">Set up ${esc(S.name)}'s profile first — the guide is written from it.</p><button class="btn" onclick="showTab('profile')">Set up profile</button></div>`; return; }
+  const t = T(), c = p.cond || {}, card = (title, body) => `<div class="card"><h3>${title}</h3>${body}</div>`;
+  const ul = items => `<ul class="gl">${items.map(x => `<li>${x}</li>`).join('')}</ul>`;
+  const bmi = p.wt / ((p.ht / 100) ** 2);
+  const goalTxt = {lose:'Lose fat slowly', recomp:'Lose fat + build muscle', keep:'Stay the same', gain:'Gain muscle'}[p.goal];
+  const lossWk = p.goal === 'recomp' ? '½–¾ kg' : p.goal === 'lose' ? '⅓–½ kg' : null;
+  let html = card(`📘 ${S.emoji} ${esc(S.name)}'s guide`,
+    `<table><tr><td>Goal</td><td>${goalTxt}</td></tr><tr><td>Calories / day</td><td>${t.k} kcal</td></tr>
+     <tr><td>Protein / day</td><td>${t.p} g</td></tr><tr><td>Added sugar</td><td>under ${t.s} g</td></tr>
+     <tr><td>Sodium</td><td>under ${t.na} mg</td></tr><tr><td>Water</td><td>${t.water} glasses</td></tr></table>
+     ${lossWk ? `<p class="small muted">Expected: about <b>${lossWk} per week</b>${p.goal === 'recomp' ? ' (≈ 7–8 kg in 3 months)' : ''}. BMI now ${r1(bmi)}.</p>` : ''}`);
+
+  // goal tips
+  const goal = [];
+  if (p.goal === 'recomp') goal.push(
+    '<b>Losing 7–8 kg in 3 months is realistic</b> (~0.6 kg/week) — the ~650 kcal/day deficit is built in.',
+    '<b>Hit protein every single day</b> — whey after the gym (in milk on gym days), curd/paneer in 2–3 meals.',
+    '<b>Lift 4 days a week with progressive overload</b> — add a little weight or reps each week.',
+    '<b>8–10k steps daily + 7–8 hours of sleep</b> — muscle is built on these as much as on food.',
+    'The scale will move slower than fat loss because you are adding muscle — also <b>measure your waist every 2 weeks</b>.');
+  else if (p.goal === 'lose') goal.push(
+    '<b>Slow and steady:</b> about ⅓–½ kg a week is safe and lasts.',
+    '<b>Walk daily</b> — start with 20–30 minutes and build up to 45 minutes or 6–8k steps.',
+    '<b>Protein at every meal</b> (dal, curd, paneer, chana, sprouts) keeps you full and protects muscle.',
+    '<b>Fill half the plate with sabzi + salad</b> before taking roti or rice.',
+    'Eat dinner by 8 pm and keep it lighter than lunch.');
+  else goal.push('Follow the plate rule: half vegetables + fruit, a quarter whole grains, a quarter dal/paneer/curd.', 'Stay active for 30–45 minutes a day.');
+  html += card('🎯 How to reach the goal', ul(goal));
+
+  html += card('✅ Eat more of', ul([
+    'Dal, rajma, chole, lobia, sprouts, soya, tofu — protein + fibre',
+    'Curd, hung curd, paneer, milk — protein + calcium',
+    'Millets: jowar, bajra, ragi; brown rice; whole-wheat roti',
+    '3+ katoris of vegetables a day, different colours (palak, methi, karela, bhindi, gajar, beans…)',
+    '1–2 fruits a day — guava, papaya, orange, apple, pear, amla',
+    'A small handful of nuts/seeds (almonds, walnuts, flax, chana)',
+    `${t.water} glasses of water`].concat(p.goal === 'recomp' ? ['1 scoop whey on gym days'] : [])));
+
+  html += card('🚫 Avoid or limit', ul([
+    'Sugar in tea/coffee, juices, soft drinks, sweets, mithai',
+    'Fried snacks — samosa, pakora, namkeen, chips, puri',
+    'Maida & bakery — naan, white bread, biscuits, cake, pizza',
+    'Big rice portions, extra ghee/butter on roti',
+    'Late-night eating',
+    'Pickle, papad, extra salt'].concat(p.goal === 'recomp' ? ['Alcohol — it slows fat loss and recovery'] : [])));
+
+  if (c.dm) html += card('🩸 Pre-diabetes / blood sugar', ul([
+    'No added sugar, honey or jaggery in tea/coffee',
+    'White rice: max 1 katori, and always with dal + sabzi; prefer brown rice or millets',
+    'Fruit: whole fruit, not juice; go easy on mango, banana, chikoo, grapes',
+    'Eat in this order: salad/sabzi → dal/paneer → roti/rice',
+    '<b>Walk 10 minutes after lunch and dinner</b>',
+    'Don\'t skip meals; eat dinner 2–3 hours before bed',
+    'Get HbA1c checked every 3–6 months']));
+  if (c.thy) html += card('🦋 Thyroid', ul([
+    '<b>Tablet first thing</b> on an empty stomach with plain water',
+    'Wait 30–60 minutes before tea or breakfast',
+    'Keep milk, curd, soya/tofu and calcium or iron tablets <b>4 hours away</b> from the tablet',
+    'Use iodised salt',
+    'Cabbage, gobi and other greens are fine when cooked, in normal amounts',
+    'Get TSH checked as your doctor advises (usually every 6–12 months)']));
+  if (c.bp) html += card('❤️ Blood pressure', ul([
+    'Total salt under ¾ teaspoon a day — cook with less, no salt on the table',
+    'No pickle, papad, namkeen, packaged soups or instant noodles',
+    'More potassium foods: vegetables, fruit, curd, dal, coconut water',
+    'Walk daily, sleep well, limit tea/coffee to 2 cups']));
+
+  // weekly menu overview
+  const wk = S.week && [1,2,3,4,5,6,0].some(d => hasItems(S.week[d]));
+  const mainDish = items => (items || []).map(it => food(it.id)).filter(f => f && !/tea|coffee|whey|salad|cucumber|chutney|milk/i.test(f.n))
+    .slice(0, 3).map(f => f.n.replace(/\s*\(.*?\)/g, '').replace(/ \/.*$/, '')).join(', ');
+  html += card('🗓️ This week\'s menu', wk
+    ? `<table class="wk">${[1,2,3,4,5,6,0].map(d => { const w = S.week[d] || {}; const tot = totals(MEALS.flatMap(([m]) => w[m] || []));
+        return `<tr onclick="setPlanSel(${d});showTab('plan')" style="cursor:pointer"><td>${DOW[d]}${d === today().getDay() ? ' ⭐' : ''}</td><td>
+          🌅 ${esc(mainDish(w.breakfast))}<br>🍛 ${esc(mainDish(w.lunch))}<br>🍎 ${esc(mainDish(w.snacks))}<br>🌙 ${esc(mainDish(w.dinner))}
+          <div class="muted">${r0(tot.k)} kcal · ${r0(tot.p)} g protein</div></td></tr>`; }).join('')}</table>
+       <p class="small muted">Tap a day to see or edit it in Plan.</p>`
+    : `<p class="small muted">No weekly menu yet. Go to Plan and tap “Load family weekly menu”.</p><button class="btn sm" onclick="showTab('plan')">Open Plan</button>`);
+
+  html += `<p class="small muted" style="padding:0 4px">This is general guidance based on ICMR-NIN's Dietary Guidelines for Indians, not medical advice. Check calorie targets and any medicine timing with your doctor.</p>`;
+  $('guide').innerHTML = html;
+}

@@ -126,6 +126,13 @@
   .qty{display:flex;align-items:center;gap:10px;justify-content:center;margin:10px 0}
   .qty button{width:44px;height:44px;border-radius:12px;background:var(--card2);border:0;font-size:1.3rem;cursor:pointer}
   .qty b{font-size:1.4rem;min-width:60px;text-align:center}
+  .conds{display:flex;flex-direction:column;gap:2px}
+  label.ck{display:flex;gap:10px;align-items:center;color:var(--text);font-size:.9rem;margin:4px 0}
+  label.ck input{width:20px;height:20px;flex:none}
+  .gl{margin:6px 0 0;padding-left:20px;font-size:.86rem;line-height:1.5}
+  .gl li{margin:3px 0}
+  .wk td{vertical-align:top;font-size:.8rem;font-weight:400;text-align:left}
+  .wk td:first-child{font-weight:700;width:42px}
   .tip{background:var(--card2);border-left:3px solid var(--accent);padding:8px 10px;border-radius:8px;font-size:.82rem;margin:6px 0}
   .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#14532d;color:#dcfce7;
          padding:8px 14px;border-radius:16px;font-size:.84rem;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
@@ -165,6 +172,8 @@
       </div>
       <ul class="issues" id="issues"></ul>
     </div>
+
+    <div class="card" id="remind" style="display:none"></div>
 
     <div class="card">
       <h3>📊 Today's nutrition</h3>
@@ -213,6 +222,10 @@
   </section>
 
   <!-- ============ PROFILE ============ -->
+  <section class="tab" id="tab-guide">
+    <div id="guide"></div>
+  </section>
+
   <section class="tab" id="tab-profile">
     <div class="card">
       <h3>👤 Profile</h3>
@@ -238,6 +251,12 @@
         <div><label>Food preference</label><select id="pDiet">
           <option value="v">Vegetarian</option><option value="e">Veg + eggs</option><option value="n">Non-vegetarian</option></select></div>
       </div>
+      <label>Health conditions</label>
+      <div class="conds">
+        <label class="ck"><input type="checkbox" id="cDm"> Pre-diabetes / diabetes</label>
+        <label class="ck"><input type="checkbox" id="cThy"> Thyroid (on tablet)</label>
+        <label class="ck"><input type="checkbox" id="cBp"> High BP</label>
+      </div>
       <button class="btn" id="saveProfile" style="margin-top:14px;width:100%">Save &amp; calculate targets</button>
       <button class="btn ghost sm" id="removePerson" style="margin-top:10px;color:#fca5a5;border-color:#7f1d1d">Remove</button>
     </div>
@@ -258,6 +277,7 @@
   <button class="on" data-tab="today"><b>🍽️</b>Today</button>
   <button data-tab="plan"><b>📋</b>Plan</button>
   <button data-tab="insights"><b>📈</b>Insights</button>
+  <button data-tab="guide"><b>📘</b>Guide</button>
   <button data-tab="profile"><b>👤</b>Profile</button>
 </nav>
 

@@ -1,5 +1,5 @@
 // Caches the app so it opens instantly and works offline.
-const CACHE = 'food-tracker-v4';
+const CACHE = 'food-tracker-v5';
 const FILES = ['./', './index.html', './manifest.json', './foods.js', './menu.js', './app.js', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
