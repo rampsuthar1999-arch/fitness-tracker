@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Food Tracker</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root{--bg:#0f172a;--card:#1e293b;--card2:#273449;--line:#334155;--text:#e2e8f0;--muted:#94a3b8;
+        --good:#22c55e;--ok:#f59e0b;--bad:#ef4444;--accent:#38bdf8;--none:#0b1222}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);
+       padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+  main{max-width:520px;margin:0 auto;padding:12px 14px}
+  h1{font-size:1.15rem;margin:6px 0 12px;text-align:center}
+  h3{font-size:.95rem;margin:0 0 10px}
+  .card{background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px}
+  .muted{color:var(--muted)} .small{font-size:.78rem}
+  button{font:inherit;color:inherit}
+  .btn{background:var(--accent);color:#06202e;border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line);font-weight:600}
+  .btn.sm{padding:6px 10px;font-size:.8rem;border-radius:9px}
+  .row{display:flex;gap:8px;align-items:center}
+  .between{justify-content:space-between}
+  .wrap{flex-wrap:wrap}
+  /* date nav */
+  .datenav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .datenav button{background:var(--card);border:0;width:40px;height:40px;border-radius:12px;font-size:1.2rem;cursor:pointer}
+  .datenav b{font-size:1rem}
+  /* score */
+  .score{display:flex;gap:14px;align-items:center}
+  .ring{width:78px;height:78px;border-radius:50%;display:grid;place-items:center;flex:none;position:relative}
+  .ring span{position:absolute;inset:7px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-size:1.35rem;font-weight:800}
+  .rating{font-weight:800;font-size:1.05rem}
+  .issues{margin:10px 0 0;padding:0;list-style:none}
+  .issues li{font-size:.84rem;padding:5px 0;border-top:1px solid var(--line);display:flex;gap:8px}
+  /* bars */
+  .bar{margin:9px 0}
+  .bar .lbl{display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px}
+  .track{height:9px;background:var(--none);border-radius:6px;overflow:hidden;position:relative}
+  .fill{height:100%;border-radius:6px;transition:width .3s}
+  /* meals */
+  .meal h3{display:flex;justify-content:space-between;align-items:center}
+  .item{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:.88rem}
+  .item .nm{flex:1;min-width:0}
+  .item .nm div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item.planned{opacity:.75}
+  .tag{font-size:.68rem;border-radius:6px;padding:1px 6px;margin-left:4px;vertical-align:middle}
+  .tag.j{background:#7f1d1d;color:#fecaca}
+  .tag.p{background:#1e3a5f;color:#bae6fd}
+  .iconbtn{background:var(--card2);border:0;border-radius:9px;min-width:34px;height:32px;cursor:pointer;font-size:.85rem;padding:0 8px}
+  .iconbtn.ok{background:#14532d;color:#bbf7d0}
+  /* water */
+  .water{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
+  .glass{width:22px;height:28px;border:2px solid var(--accent);border-top:0;border-radius:0 0 6px 6px;opacity:.35}
+  .glass.on{background:var(--accent);opacity:1}
+  /* nav */
+  nav{position:fixed;bottom:0;left:0;right:0;background:#0b1222;border-top:1px solid var(--line);display:flex;
+      padding-bottom:env(safe-area-inset-bottom);z-index:5}
+  nav button{flex:1;background:none;border:0;padding:9px 0 10px;font-size:.72rem;color:var(--muted);cursor:pointer}
+  nav button b{display:block;font-size:1.25rem;margin-bottom:2px}
+  nav button.on{color:var(--accent)}
+  .tab{display:none} .tab.on{display:block}
+  /* calendar */
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .cal .dow{text-align:center;font-size:.7rem;color:var(--muted)}
+  .cal .d{aspect-ratio:1;border-radius:10px;background:var(--none);display:grid;place-items:center;font-size:.82rem;cursor:pointer;position:relative}
+  .cal .d.e{background:transparent;cursor:default}
+  .cal .d.today{outline:2px solid var(--accent)}
+  .cal .d.good{background:#166534}.cal .d.ok{background:#92400e}.cal .d.bad{background:#991b1b}.cal .d.prog{background:#1e3a5f}
+  .legend{display:flex;gap:12px;justify-content:center;font-size:.72rem;color:var(--muted);margin-top:10px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+  /* forms */
+  label{display:block;font-size:.8rem;color:var(--muted);margin:10px 0 4px}
+  input,select{width:100%;background:var(--none);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px;font-size:1rem}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px}
+  table{width:100%;border-collapse:collapse;font-size:.84rem}
+  td{padding:6px 0;border-top:1px solid var(--line)} td:last-child{text-align:right;font-weight:700}
+  /* sheet */
+  .sheet-bg{position:fixed;inset:0;background:#0009;display:none;z-index:10}
+  .sheet{position:fixed;left:0;right:0;bottom:0;max-height:88vh;background:var(--card);border-radius:18px 18px 0 0;
+         padding:14px 14px calc(14px + env(safe-area-inset-bottom));display:none;z-index:11;flex-direction:column;max-width:560px;margin:0 auto}
+  .sheet.on,.sheet-bg.on{display:flex}
+  .results{overflow:auto;flex:1;margin-top:8px;min-height:200px}
+  .res{display:flex;justify-content:space-between;gap:8px;padding:10px 4px;border-top:1px solid var(--line);cursor:pointer;font-size:.88rem}
+  .res:active{background:var(--card2)}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding:6px 0}
+  .chip{flex:none;background:var(--card2);border:1px solid var(--line);border-radius:20px;padding:6px 12px;font-size:.8rem;cursor:pointer}
+  .chip.on{background:var(--accent);color:#06202e;border-color:var(--accent);font-weight:700}
+  .qty{display:flex;align-items:center;gap:10px;justify-content:center;margin:10px 0}
+  .qty button{width:44px;height:44px;border-radius:12px;background:var(--card2);border:0;font-size:1.3rem;cursor:pointer}
+  .qty b{font-size:1.4rem;min-width:60px;text-align:center}
+  .tip{background:var(--card2);border-left:3px solid var(--accent);padding:8px 10px;border-radius:8px;font-size:.82rem;margin:6px 0}
+</style>
+</head>
+<body>
+<main>
+  <h1>🥗 Food Tracker</h1>
+
+  <!-- ============ TODAY ============ -->
+  <section class="tab on" id="tab-today">
+    <div class="datenav">
+      <button id="dPrev" aria-label="Previous day">‹</button>
+      <b id="dLabel"></b>
+      <button id="dNext" aria-label="Next day">›</button>
+    </div>
+
+    <div class="card" id="setupNote" style="display:none">
+      <b>👋 Start by filling in your profile</b>
+      <p class="small muted">Your ideal daily amounts are worked out from your age, weight, height, activity and goal.</p>
+      <button class="btn" onclick="showTab('profile')">Set up profile</button>
+    </div>
+
+    <div class="card">
+      <div class="score">
+        <div class="ring" id="ring"><span id="scoreNum">–</span></div>
+        <div>
+          <div class="rating" id="ratingTxt">–</div>
+          <div class="small muted" id="ratingSub"></div>
+        </div>
+      </div>
+      <ul class="issues" id="issues"></ul>
+    </div>
+
+    <div class="card">
+      <h3>Today vs your ideal amounts</h3>
+      <div id="bars"></div>
+      <div class="row between" style="margin-top:12px">
+        <span class="small">💧 Water <b id="waterTxt"></b></span>
+        <div class="row"><button class="iconbtn" id="wMinus">−</button><button class="iconbtn" id="wPlus">+ glass</button></div>
+      </div>
+      <div class="water" id="water"></div>
+    </div>
+
+    <div id="meals"></div>
+  </section>
+
+  <!-- ============ PLAN ============ -->
+  <section class="tab" id="tab-plan">
+    <div class="card">
+      <h3>📋 What I should eat (my daily plan)</h3>
+      <p class="small muted" style="margin-top:-4px">This plan shows on every day in the Today tab. Tap ✓ there when you eat it.</p>
+      <div class="row wrap">
+        <button class="btn" id="suggestBtn">✨ Suggest a healthy plan</button>
+        <button class="btn ghost sm" id="clearPlan">Clear plan</button>
+      </div>
+      <div id="planTotals" style="margin-top:10px"></div>
+    </div>
+    <div id="planMeals"></div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section class="tab" id="tab-history">
+    <div class="card">
+      <div class="datenav" style="margin-bottom:8px">
+        <button id="mPrev">‹</button><b id="mLabel"></b><button id="mNext">›</button>
+      </div>
+      <div class="cal" id="cal"></div>
+      <div class="legend">
+        <span><i style="background:#166534"></i>Healthy</span><span><i style="background:#92400e"></i>Okay</span>
+        <span><i style="background:#991b1b"></i>Unhealthy</span><span><i style="background:#1e3a5f"></i>Today</span>
+      </div>
+      <p class="small muted" style="text-align:center;margin-bottom:0">Tap a day to open it.</p>
+    </div>
+    <div class="card" id="weekCard"></div>
+  </section>
+
+  <!-- ============ PROFILE ============ -->
+  <section class="tab" id="tab-profile">
+    <div class="card">
+      <h3>👤 About you</h3>
+      <div class="grid2">
+        <div><label>Sex</label><select id="pSex"><option value="m">Male</option><option value="f">Female</option></select></div>
+        <div><label>Age (years)</label><input id="pAge" type="number" inputmode="numeric" min="14" max="100"></div>
+        <div><label>Height (cm)</label><input id="pHt" type="number" inputmode="decimal" min="120" max="230"></div>
+        <div><label>Weight (kg)</label><input id="pWt" type="number" inputmode="decimal" min="30" max="250"></div>
+      </div>
+      <label>Activity level</label>
+      <select id="pAct">
+        <option value="1.2">Mostly sitting, little exercise</option>
+        <option value="1.375">Light: exercise 1–3 days/week</option>
+        <option value="1.55">Moderate: gym/run 3–5 days/week</option>
+        <option value="1.725">Very active: hard exercise 6–7 days/week</option>
+      </select>
+      <div class="grid2">
+        <div><label>Goal</label><select id="pGoal">
+          <option value="lose">Lose fat slowly</option><option value="keep">Stay the same</option><option value="gain">Gain muscle</option></select></div>
+        <div><label>Food preference</label><select id="pDiet">
+          <option value="v">Vegetarian</option><option value="e">Veg + eggs</option><option value="n">Non-vegetarian</option></select></div>
+      </div>
+      <button class="btn" id="saveProfile" style="margin-top:14px;width:100%">Save &amp; calculate my targets</button>
+    </div>
+    <div class="card" id="targetCard"></div>
+    <div class="card">
+      <h3>💾 Backup</h3>
+      <p class="small muted">Your data is stored on this phone only. Export a backup now and then.</p>
+      <div class="row"><button class="btn ghost sm" id="exportBtn">Export backup</button>
+        <button class="btn ghost sm" id="importBtn">Import backup</button>
+        <input type="file" id="importFile" accept="application/json" hidden></div>
+      <p class="small muted">Nutrition numbers are typical home-style estimates per serving, based on the ICMR-NIN Dietary Guidelines for Indians (2024). This is a guide, not medical advice — if you have diabetes, BP, kidney or other conditions, follow your doctor's targets.</p>
+      <p class="small"><a href="../" style="color:var(--accent)">🏋️ Open Gym &amp; Run Tracker</a></p>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button class="on" data-tab="today"><b>🍽️</b>Today</button>
+  <button data-tab="plan"><b>📋</b>Plan</button>
+  <button data-tab="history"><b>📅</b>History</button>
+  <button data-tab="profile"><b>👤</b>Profile</button>
+</nav>
+
+<!-- ============ ADD FOOD SHEET ============ -->
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="sheet">
+  <div id="pickView" style="display:flex;flex-direction:column;min-height:0;flex:1">
+    <div class="row between"><b id="sheetTitle">Add food</b><button class="iconbtn" id="closeSheet">✕</button></div>
+    <div class="chips" id="mealChips"></div>
+    <input id="search" placeholder="Search: roti, dal, paneer, banana…" autocomplete="off">
+    <div class="chips" id="groupChips"></div>
+    <div class="results" id="results"></div>
+    <button class="btn ghost sm" id="customBtn" style="margin-top:8px">+ Food not in list? Add your own</button>
+  </div>
+  <div id="qtyView" style="display:none;flex-direction:column">
+    <div class="row between"><b id="qName"></b><button class="iconbtn" id="qBack">‹ Back</button></div>
+    <div class="small muted" id="qServing"></div>
+    <div class="qty"><button id="qMinus">−</button><b id="qVal">1</b><button id="qPlus">+</button></div>
+    <div id="qInfo"></div>
+    <button class="btn" id="qAdd" style="margin-top:12px">Add</button>
+  </div>
+  <div id="customView" style="display:none;flex-direction:column;overflow:auto">
+    <div class="row between"><b>Add your own food</b><button class="iconbtn" id="cBack">‹ Back</button></div>
+    <p class="small muted">Copy these from the food packet label (per serving), or a nutrition website.</p>
+    <label>Name</label><input id="cName" placeholder="e.g. Mom's thepla">
+    <label>Serving</label><input id="cServ" placeholder="e.g. 1 piece">
+    <div class="grid3">
+      <div><label>Calories</label><input id="cK" type="number" inputmode="decimal"></div>
+      <div><label>Protein g</label><input id="cP" type="number" inputmode="decimal"></div>
+      <div><label>Carbs g</label><input id="cC" type="number" inputmode="decimal"></div>
+      <div><label>Fat g</label><input id="cF" type="number" inputmode="decimal"></div>
+      <div><label>Fibre g</label><input id="cFb" type="number" inputmode="decimal"></div>
+      <div><label>Sugar g</label><input id="cS" type="number" inputmode="decimal"></div>
+      <div><label>Sodium mg</label><input id="cNa" type="number" inputmode="decimal"></div>
+      <div><label>Veg g</label><input id="cVg" type="number" inputmode="decimal"></div>
+      <div><label>Fruit g</label><input id="cFg" type="number" inputmode="decimal"></div>
+    </div>
+    <label><input type="checkbox" id="cJ" style="width:auto"> Fried / junk / sweet item</label>
+    <button class="btn" id="cSave" style="margin-top:12px">Save food</button>
+  </div>
+</div>
+
+<script>
+/* ======================= FOOD DATABASE =======================
+   Per serving: [name, serving, kcal, protein g, carbs g, fat g, fibre g, added/free sugar g,
+                 sodium mg, group, diet (v/e/n), vegetable g, fruit g, junk 0/1]
+   Typical home-style Indian portions; values are estimates. */
+const RAW = [
+// Cereals & grains
+["Roti / chapati (no ghee)","1 medium",120,3.5,20,3,3,0,5,"Grains","v",0,0,0],
+["Roti with ghee","1 medium",150,3.5,20,6,3,0,5,"Grains","v",0,0,0],
+["Phulka","1 small",70,2.5,14,0.5,2,0,3,"Grains","v",0,0,0],
+["Bajra roti","1",130,4,24,2,4,0,5,"Grains","v",0,0,0],
+["Jowar roti","1",120,3.5,25,1,3.5,0,5,"Grains","v",0,0,0],
+["Makki roti","1",160,3,27,4,3,0,5,"Grains","v",0,0,0],
+["Plain paratha","1",220,5,30,9,4,0,200,"Grains","v",0,0,0],
+["Aloo paratha","1",290,6,40,12,4,0,350,"Grains","v",30,0,0],
+["Paneer / gobi paratha","1",300,10,36,13,4,0,350,"Grains","v",30,0,0],
+["Puri","2 pieces",250,4,26,15,1.5,0,150,"Grains","v",0,0,1],
+["White rice (cooked)","1 katori (150 g)",195,4,43,0.5,0.6,0,2,"Grains","v",0,0,0],
+["Brown rice (cooked)","1 katori (150 g)",165,3.8,34,1.3,2.7,0,2,"Grains","v",0,0,0],
+["Jeera rice","1 katori",240,4,42,6,1,0,300,"Grains","v",0,0,0],
+["Veg pulao","1 plate (200 g)",300,6,50,9,3,0,450,"Grains","v",50,0,0],
+["Veg biryani","1 plate (250 g)",400,9,60,13,4,0,700,"Grains","v",60,0,0],
+["Chicken biryani","1 plate (250 g)",480,22,55,18,2,0,800,"Grains","n",0,0,0],
+["Khichdi","1 bowl (200 g)",230,8,38,5,4,0,400,"Grains","v",20,0,0],
+["Poha","1 plate (150 g)",250,5,40,8,2.5,1,400,"Grains","v",30,0,0],
+["Upma","1 plate (150 g)",250,6,35,9,3,0,450,"Grains","v",30,0,0],
+["Vegetable daliya","1 bowl",180,6,33,3,5,0,300,"Grains","v",40,0,0],
+["Idli","1 piece",60,2,12,0.3,0.6,0,120,"Grains","v",0,0,0],
+["Plain dosa","1",170,4,28,5,1,0,250,"Grains","v",0,0,0],
+["Masala dosa","1",350,7,48,14,4,0,550,"Grains","v",50,0,0],
+["Uttapam","1",220,6,35,6,2.5,0,350,"Grains","v",40,0,0],
+["Oats (cooked in water)","1 bowl (40 g dry)",150,5,27,3,4,0,5,"Grains","v",0,0,0],
+["Oats with milk & fruit","1 bowl",280,11,45,7,5,0,100,"Grains","v",0,50,0],
+["Muesli (unsweetened) with milk","1 bowl",300,11,45,8,5,5,100,"Grains","v",0,0,0],
+["Cornflakes with milk & sugar","1 bowl",240,8,42,4,1.5,14,300,"Grains","v",0,0,0],
+["White bread","1 slice",70,2.5,13,1,0.7,1.5,130,"Grains","v",0,0,0],
+["Brown / whole-wheat bread","1 slice",70,3,12,1,2,1.5,130,"Grains","v",0,0,0],
+["Instant noodles (Maggi)","1 packet",350,7,48,14,2,1,1100,"Grains","v",0,0,1],
+["Pasta (white sauce)","1 plate",450,13,55,20,3,4,700,"Grains","v",20,0,1],
+// Pulses & legumes
+["Dal (toor/moong, plain)","1 katori (150 g)",150,8,20,4,4,0,350,"Dal & pulses","v",0,0,0],
+["Dal tadka / fry","1 katori",180,8,20,7,4,0,450,"Dal & pulses","v",0,0,0],
+["Dal makhani","1 katori",280,10,24,16,6,0,500,"Dal & pulses","v",0,0,0],
+["Rajma curry","1 katori",210,9,28,7,7,0,450,"Dal & pulses","v",0,0,0],
+["Chole","1 katori",240,10,32,8,8,0,500,"Dal & pulses","v",0,0,0],
+["Sambar","1 katori",130,6,18,4,4,0,500,"Dal & pulses","v",50,0,0],
+["Kadhi","1 katori",160,6,12,10,1,0,450,"Dal & pulses","v",0,0,0],
+["Moong sprouts salad","1 bowl (100 g)",110,8,18,0.5,5,0,150,"Dal & pulses","v",30,0,0],
+["Roasted chana","1 handful (30 g)",110,6,18,1.5,5,0,10,"Dal & pulses","v",0,0,0],
+["Besan chilla","1",150,7,18,6,3,0,250,"Dal & pulses","v",20,0,0],
+["Moong dal chilla","1",130,8,17,3.5,3,0,200,"Dal & pulses","v",20,0,0],
+["Soya chunks curry","1 katori",200,18,14,8,5,0,450,"Dal & pulses","v",30,0,0],
+["Dhokla","2 pieces",150,6,22,4,2,4,400,"Dal & pulses","v",0,0,0],
+// Vegetables
+["Mixed veg sabzi","1 katori (150 g)",130,3,14,7,4,0,400,"Vegetables","v",130,0,0],
+["Aloo sabzi","1 katori",180,3,25,8,3,0,400,"Vegetables","v",30,0,0],
+["Bhindi sabzi","1 katori",140,3,12,9,4,0,350,"Vegetables","v",130,0,0],
+["Gobi / cabbage sabzi","1 katori",140,4,13,8,4,0,400,"Vegetables","v",130,0,0],
+["Lauki / tori / tinda sabzi","1 katori",90,2,10,5,3,0,350,"Vegetables","v",140,0,0],
+["Baingan bharta","1 katori",130,3,12,8,5,0,400,"Vegetables","v",140,0,0],
+["Palak / saag","1 katori",120,4,10,7,4,0,400,"Vegetables","v",140,0,0],
+["Palak paneer","1 katori",260,13,10,19,3,0,500,"Vegetables","v",80,0,0],
+["Matar paneer","1 katori",250,12,14,16,4,2,500,"Vegetables","v",50,0,0],
+["Paneer butter masala","1 katori",380,14,14,30,2,5,700,"Vegetables","v",30,0,1],
+["Green salad (cucumber, tomato, onion, carrot)","1 bowl (100 g)",25,1,5,0.2,1.5,0,10,"Vegetables","v",100,0,0],
+["Boiled / steamed vegetables","1 bowl (150 g)",60,3,11,0.5,4,0,30,"Vegetables","v",150,0,0],
+["Vegetable soup","1 bowl",70,2,12,1.5,3,0,500,"Vegetables","v",100,0,0],
+["Veg raita","1 katori",90,4,7,5,1,0,250,"Vegetables","v",40,0,0],
+// Fruits
+["Banana","1 medium",105,1.3,27,0.4,3,0,1,"Fruits","v",0,100,0],
+["Apple","1 medium",95,0.5,25,0.3,4,0,2,"Fruits","v",0,150,0],
+["Orange / mosambi","1",60,1.2,15,0.2,3,0,0,"Fruits","v",0,130,0],
+["Guava","1",70,2.5,14,1,5,0,2,"Fruits","v",0,120,0],
+["Papaya","1 bowl (150 g)",60,0.7,15,0.4,2.5,0,12,"Fruits","v",0,150,0],
+["Mango","1 cup (150 g)",100,1.4,25,0.6,2.6,0,2,"Fruits","v",0,150,0],
+["Pomegranate","½ cup seeds",75,1.5,17,1,3.5,0,3,"Fruits","v",0,90,0],
+["Watermelon","1 bowl (200 g)",60,1.2,15,0.3,0.8,0,2,"Fruits","v",0,200,0],
+["Grapes","1 cup (100 g)",70,0.7,18,0.2,0.9,0,2,"Fruits","v",0,100,0],
+["Chikoo","1",80,0.5,20,1,5,0,10,"Fruits","v",0,100,0],
+["Pear","1",100,0.6,27,0.2,5.5,0,2,"Fruits","v",0,170,0],
+["Mixed fruit bowl","1 bowl (150 g)",90,1.2,22,0.4,3,0,3,"Fruits","v",0,150,0],
+["Dates","2 pieces",45,0.4,12,0,1.3,0,0,"Fruits","v",0,0,0],
+["Fresh fruit juice (no sugar)","1 glass",110,1,26,0.4,0.5,20,5,"Drinks","v",0,0,0],
+// Dairy
+["Milk (toned, no sugar)","1 glass (250 ml)",145,8,12,7.5,0,0,110,"Dairy","v",0,0,0],
+["Milk with sugar / Bournvita","1 glass",190,8,24,7.5,0,12,120,"Dairy","v",0,0,0],
+["Curd / dahi","1 katori (150 g)",90,5,7,5,0,0,60,"Dairy","v",0,0,0],
+["Greek yogurt / hung curd","100 g",70,9,4,2,0,0,40,"Dairy","v",0,0,0],
+["Buttermilk / chaas","1 glass",40,2,4,1.5,0,0,250,"Dairy","v",0,0,0],
+["Paneer (plain)","50 g",130,9,1.5,10,0,0,15,"Dairy","v",0,0,0],
+["Paneer bhurji","1 katori",280,16,8,20,1.5,0,450,"Dairy","v",30,0,0],
+["Sweet lassi","1 glass",220,7,30,7,0,22,100,"Dairy","v",0,0,0],
+["Cheese slice","1",60,3.5,1,5,0,0,250,"Dairy","v",0,0,1],
+// Eggs, meat, fish
+["Boiled egg","1",78,6.3,0.6,5.3,0,0,62,"Egg & meat","e",0,0,0],
+["Omelette (2 eggs)","1",190,13,2,15,0.3,0,350,"Egg & meat","e",15,0,0],
+["Egg bhurji (2 eggs)","1 serving",220,13,4,17,0.5,0,400,"Egg & meat","e",20,0,0],
+["Egg curry (2 eggs)","1 katori",260,14,8,19,1.5,0,550,"Egg & meat","e",20,0,0],
+["Chicken curry","1 katori (150 g)",260,25,6,15,1,0,550,"Egg & meat","n",0,0,0],
+["Tandoori / grilled chicken","150 g",240,35,4,9,1,0,600,"Egg & meat","n",0,0,0],
+["Chicken breast (boiled)","100 g",165,31,0,3.6,0,0,74,"Egg & meat","n",0,0,0],
+["Butter chicken","1 katori",430,25,12,31,1.5,5,800,"Egg & meat","n",0,0,1],
+["Fish curry","1 katori",220,22,6,12,1,0,500,"Egg & meat","n",0,0,0],
+["Fried fish","1 piece (100 g)",250,20,10,15,0.5,0,400,"Egg & meat","n",0,0,1],
+["Mutton curry","1 katori",330,24,6,23,1,0,600,"Egg & meat","n",0,0,0],
+// Nuts & seeds
+["Almonds","10 pieces",70,2.5,2.5,6,1.5,0,0,"Nuts & seeds","v",0,0,0],
+["Walnuts","4 halves",65,1.5,1.4,6.5,0.7,0,0,"Nuts & seeds","v",0,0,0],
+["Peanuts (roasted)","1 handful (30 g)",170,7,5,14,2.5,0,5,"Nuts & seeds","v",0,0,0],
+["Mixed nuts","1 handful (30 g)",180,5,7,15,2.5,0,3,"Nuts & seeds","v",0,0,0],
+["Peanut butter (unsweetened)","1 tbsp",95,4,3,8,1,1,70,"Nuts & seeds","v",0,0,0],
+["Flax / chia seeds","1 tbsp",55,2,3,4,3,0,3,"Nuts & seeds","v",0,0,0],
+["Roasted makhana","1 bowl (25 g)",90,2.5,19,0.5,1.5,0,150,"Nuts & seeds","v",0,0,0],
+// Snacks
+["Samosa","1",260,4,28,15,2,0,400,"Snacks","v",20,0,1],
+["Pakora / bhajiya","1 plate (6)",300,6,25,20,3,0,450,"Snacks","v",30,0,1],
+["Vada pav","1",300,7,40,13,3,1,600,"Snacks","v",0,0,1],
+["Kachori","1",280,5,28,17,2,0,350,"Snacks","v",0,0,1],
+["Pani puri","6 pieces",200,4,32,6,3,3,500,"Snacks","v",0,0,1],
+["Bhel puri","1 plate",250,6,40,8,4,4,600,"Snacks","v",40,0,0],
+["Pav bhaji","1 plate (2 pav)",450,10,60,19,7,4,1100,"Snacks","v",100,0,1],
+["Chips / namkeen","1 small packet (30 g)",160,2,15,10,1,0.5,220,"Snacks","v",0,0,1],
+["Biscuits","4 pieces",140,2,22,5,0.5,8,120,"Snacks","v",0,0,1],
+["Veg sandwich (grilled)","1",280,9,38,10,4,3,600,"Snacks","v",50,0,0],
+["Momos (steamed)","6 pieces",250,9,36,8,2,1,600,"Snacks","v",30,0,0],
+["Momos (fried)","6 pieces",380,9,38,21,2,1,650,"Snacks","v",30,0,1],
+["Pizza","2 slices",550,22,62,23,4,6,1200,"Snacks","v",30,0,1],
+["Burger","1",450,15,48,22,3,7,850,"Snacks","v",20,0,1],
+["French fries","1 medium",330,4,42,16,4,0,250,"Snacks","v",0,0,1],
+["Khakhra","2",120,3.5,18,4,2.5,0,250,"Snacks","v",0,0,0],
+["Popcorn (home, light butter)","1 bowl (25 g)",110,3,19,2.5,3.5,0,100,"Snacks","v",0,0,0],
+// Sweets
+["Gulab jamun","1",150,2,22,6,0.3,18,20,"Sweets","v",0,0,1],
+["Rasgulla","1",120,3,25,1,0,22,15,"Sweets","v",0,0,1],
+["Jalebi","50 g",200,1.5,30,9,0.3,22,10,"Sweets","v",0,0,1],
+["Kheer","1 katori",250,7,35,9,0.5,20,80,"Sweets","v",0,0,1],
+["Halwa (sooji / gajar)","1 katori",300,4,40,14,2,25,50,"Sweets","v",0,0,1],
+["Laddoo","1",190,3,25,9,1,15,20,"Sweets","v",0,0,1],
+["Ice cream","1 scoop",140,2.5,17,7,0.5,14,50,"Sweets","v",0,0,1],
+["Milk chocolate","25 g",135,2,15,8,0.8,13,20,"Sweets","v",0,0,1],
+["Dark chocolate (70%+)","20 g",120,1.5,9,8.5,2,5,5,"Sweets","v",0,0,0],
+["Cake / pastry","1 piece",350,4,45,17,1,30,250,"Sweets","v",0,0,1],
+// Drinks
+["Tea with milk & sugar","1 cup",70,2,10,2,0,8,15,"Drinks","v",0,0,0],
+["Tea with milk, no sugar","1 cup",35,2,3,2,0,0,15,"Drinks","v",0,0,0],
+["Coffee with milk & sugar","1 cup",90,3,12,3,0,8,40,"Drinks","v",0,0,0],
+["Black coffee / green tea","1 cup",2,0.2,0,0,0,0,2,"Drinks","v",0,0,0],
+["Coconut water","1 glass",45,1.7,9,0.5,2.6,0,250,"Drinks","v",0,0,0],
+["Nimbu pani with sugar","1 glass",60,0,15,0,0,15,250,"Drinks","v",0,0,0],
+["Packaged fruit juice","1 glass (200 ml)",110,0.5,26,0,0.3,22,10,"Drinks","v",0,0,1],
+["Soft drink / cola","1 can (330 ml)",140,0,35,0,0,35,15,"Drinks","v",0,0,1],
+// Extras
+["Ghee","1 tsp",45,0,0,5,0,0,0,"Extras","v",0,0,0],
+["Butter","1 tsp",36,0,0,4,0,0,30,"Extras","v",0,0,0],
+["Pickle (achaar)","1 tbsp",40,0.2,1,4,0.5,0,600,"Extras","v",0,0,0],
+["Papad (roasted)","1",35,2.5,6,0.2,1.5,0,400,"Extras","v",0,0,0],
+["Sugar","1 tsp",20,0,5,0,0,5,0,"Extras","v",0,0,0],
+];
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const FOODS = {};
+RAW.forEach(r => { const id = slug(r[0]);
+  FOODS[id] = {id, n:r[0], sv:r[1], k:r[2], p:r[3], c:r[4], f:r[5], fb:r[6], s:r[7], na:r[8], g:r[9], d:r[10], vg:r[11], fg:r[12], j:r[13]}; });
+const GROUPS = ['All','Grains','Dal & pulses','Vegetables','Fruits','Dairy','Egg & meat','Nuts & seeds','Snacks','Sweets','Drinks','Extras','My foods'];
+const MEALS = [['breakfast','🌅 Breakfast'],['lunch','🍛 Lunch'],['snacks','🍎 Snacks'],['dinner','🌙 Dinner']];
+
+/* ======================= STATE ======================= */
+const KEY = 'foodTracker.v1';
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+S = Object.assign({profile:null, plan:{breakfast:[],lunch:[],snacks:[],dinner:[]}, days:{}, custom:[], recent:[]}, S || {});
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const food = id => FOODS[id] || S.custom.find(c => c.id === id);
+
+const pad = n => String(n).padStart(2,'0');
+const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseKey = k => { const [y,m,d] = k.split('-').map(Number); return new Date(y, m-1, d); };
+const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+let cur = keyOf(today());
+let calView = new Date(today().getFullYear(), today().getMonth(), 1);
+const $ = id => document.getElementById(id);
+const r0 = x => Math.round(x), r1 = x => Math.round(x*10)/10;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtQ = q => q === 0.5 ? '½' : (q % 1 === 0.5 ? Math.floor(q) + '½' : String(q));
+
+function day(k, create) {
+  if (!S.days[k] && create) S.days[k] = {meals:{breakfast:[],lunch:[],snacks:[],dinner:[]}, water:0};
+  return S.days[k];
+}
+
+/* ======================= TARGETS =======================
+   Calories: Mifflin-St Jeor BMR × activity, ±goal (gentle, never below safe floor).
+   Fat ≤ 30% of calories (ICMR-NIN 2024) — aim 25%. Free/added sugar ≤ 5% of calories.
+   Salt < 5 g/day ⇒ sodium ≤ 2000 mg. Vegetables ≥ 400 g, fruit ≥ 100 g (≥ 500 g together).
+   Protein 1.0 g/kg (1.2 g/kg if you train most days). Fibre 15 g per 1000 kcal. */
+function targets(p) {
+  p = p || {sex:'m', age:30, ht:170, wt:70, act:1.375, goal:'keep', diet:'v'};
+  const bmr = 10*p.wt + 6.25*p.ht - 5*p.age + (p.sex === 'm' ? 5 : -161);
+  const tdee = bmr * p.act;
+  let k = tdee + (p.goal === 'lose' ? -400 : p.goal === 'gain' ? 300 : 0);
+  const floor = Math.max(bmr, p.sex === 'm' ? 1500 : 1200);
+  if (p.goal === 'lose') k = Math.max(k, floor);
+  k = Math.round(k / 10) * 10;
+  const protein = Math.round(p.wt * (p.act >= 1.55 || p.goal === 'gain' ? 1.2 : 1.0));
+  const fat = Math.round(k * 0.25 / 9);
+  const carbs = Math.round((k - protein*4 - fat*9) / 4);
+  return { k, p:protein, c:carbs, f:fat, fatMax: Math.round(k*0.30/9), fb: Math.max(25, Math.round(k/1000*15)),
+           s: Math.round(k*0.05/4), na:2000, vg:400, fg:100, water: Math.max(8, Math.round(p.wt*35/250)), tdee: Math.round(tdee) };
+}
+const T = () => targets(S.profile);
+
+function totals(items) {
+  const t = {k:0,p:0,c:0,f:0,fb:0,s:0,na:0,vg:0,fg:0,j:0,n:0};
+  items.forEach(it => { const fd = food(it.id); if (!fd) return;
+    for (const x of ['k','p','c','f','fb','s','na','vg','fg','j']) t[x] += (fd[x]||0) * it.q; t.n++; });
+  return t;
+}
+const allItems = d => d ? MEALS.flatMap(([m]) => d.meals[m] || []) : [];
+
+/* ======================= HEALTH SCORE ======================= */
+function evaluate(k) {
+  const d = day(k), t = T(), tot = totals(allItems(d));
+  if (!d || tot.n === 0) return null;
+  const isToday = k === keyOf(today());
+  const hr = new Date().getHours();
+  const final = !isToday || hr >= 21;            // judge "too little" only once the day is over
+  let s = 100; const bad = [], good = [];
+  const pen = (pts, msg) => { s -= pts; bad.push(msg); };
+  const kr = tot.k / t.k;
+  if (kr > 1.3) pen(25, `Calories far over: ${r0(tot.k)} of ${t.k} kcal`);
+  else if (kr > 1.15) pen(12, `Calories a bit over: ${r0(tot.k)} of ${t.k} kcal`);
+  else if (final && kr < 0.6) pen(20, `Ate too little: ${r0(tot.k)} of ${t.k} kcal (or log incomplete)`);
+  else if (final && kr < 0.8) pen(8, `Calories low: ${r0(tot.k)} of ${t.k} kcal`);
+  else if (kr >= 0.85 && kr <= 1.15) good.push('Calories on target');
+  if (final) {
+    if (tot.p < t.p*0.6) pen(20, `Protein very low: ${r0(tot.p)} of ${t.p} g — add dal, paneer, curd, sprouts${S.profile && S.profile.diet!=='v' ? ', eggs' : ''}${S.profile && S.profile.diet==='n' ? ', chicken/fish' : ''}`);
+    else if (tot.p < t.p*0.85) pen(10, `Protein low: ${r0(tot.p)} of ${t.p} g`);
+    else good.push('Protein on target');
+    if (tot.fb < t.fb*0.5) pen(15, `Fibre very low: ${r0(tot.fb)} of ${t.fb} g — more veg, fruit, whole grains, dal`);
+    else if (tot.fb < t.fb*0.8) pen(8, `Fibre low: ${r0(tot.fb)} of ${t.fb} g`);
+    else good.push('Good fibre');
+    if (tot.vg < 200) pen(15, `Too few vegetables: ~${r0(tot.vg)} of ${t.vg} g`);
+    else if (tot.vg < 350) pen(7, `Vegetables a bit low: ~${r0(tot.vg)} of ${t.vg} g`);
+    else good.push('Plenty of vegetables');
+    if (tot.fg < 50) pen(8, `No fruit today — aim for ${t.fg} g`); else good.push('Had fruit');
+    const wt = (d.water||0) / t.water;
+    if (wt < 0.6) pen(5, `Drank little water: ${d.water||0} of ${t.water} glasses`);
+  }
+  if (tot.s > t.s*2) pen(20, `Way too much sugar: ${r0(tot.s)} g (limit ${t.s} g)`);
+  else if (tot.s > t.s) pen(10, `Sugar over limit: ${r0(tot.s)} g (limit ${t.s} g)`);
+  if (tot.na > t.na*1.5) pen(15, `Too much salt: ${r0(tot.na)} mg sodium (limit ${t.na})`);
+  else if (tot.na > t.na) pen(8, `Salt a bit high: ${r0(tot.na)} mg sodium (limit ${t.na})`);
+  const fatPct = tot.k ? tot.f*9/tot.k*100 : 0;
+  if (tot.k > 600 && fatPct > 35) pen(10, `Too oily: ${r0(fatPct)}% of calories from fat (keep under 30%)`);
+  if (tot.j >= 3) pen(15, `${r0(tot.j)} servings of fried/junk/sweets`);
+  else if (tot.j >= 1.5) pen(8, `${r1(tot.j)} servings of fried/junk/sweets`);
+  else if (tot.j >= 1) pen(3, `1 fried/junk/sweet item`);
+  s = Math.max(0, Math.min(100, s));
+  const rating = s >= 75 ? 'good' : s >= 50 ? 'ok' : 'bad';
+  return {s, rating, bad, good, tot, final};
+}
+const RLABEL = {good:'Healthy day 💚', ok:'Okay day 🟠', bad:'Unhealthy day 🔴'};
+const RCOLOR = {good:'var(--good)', ok:'var(--ok)', bad:'var(--bad)'};
+
+/* ======================= RENDER: TODAY ======================= */
+function bar(label, val, tgt, unit, kind) {
+  // kind: 'goal' (reach it), 'limit' (stay under), 'range' (hit near)
+  const pct = tgt ? val/tgt : 0;
+  let col = 'var(--accent)';
+  if (kind === 'limit') col = pct > 1 ? 'var(--bad)' : pct > 0.8 ? 'var(--ok)' : 'var(--good)';
+  else if (kind === 'range') col = pct > 1.15 ? 'var(--bad)' : pct >= 0.85 ? 'var(--good)' : 'var(--accent)';
+  else col = pct >= 0.9 ? 'var(--good)' : 'var(--accent)';
+  const note = kind === 'limit' ? ` limit` : '';
+  return `<div class="bar"><div class="lbl"><span>${label}</span><span><b>${r0(val)}</b> / ${tgt} ${unit}${note}</span></div>
+    <div class="track"><div class="fill" style="width:${Math.min(100,pct*100)}%;background:${col}"></div></div></div>`;
+}
+
+function renderToday() {
+  const td = keyOf(today()), dt = parseKey(cur);
+  const diff = Math.round((dt - today()) / 864e5);
+  $('dLabel').textContent = (diff === 0 ? 'Today' : diff === -1 ? 'Yesterday' : diff === 1 ? 'Tomorrow' : '') +
+     (Math.abs(diff) <= 1 ? ' · ' : '') + dt.toLocaleDateString(undefined, {weekday:'short', day:'numeric', month:'short'});
+  $('setupNote').style.display = S.profile ? 'none' : 'block';
+  const d = day(cur), t = T(), tot = totals(allItems(d)), ev = evaluate(cur);
+
+  // score
+  if (ev) {
+    $('scoreNum').textContent = ev.s;
+    $('ring').style.background = `conic-gradient(${RCOLOR[ev.rating]} ${ev.s*3.6}deg, var(--none) 0)`;
+    $('ratingTxt').textContent = ev.final ? RLABEL[ev.rating] : 'So far: ' + RLABEL[ev.rating];
+    $('ratingTxt').style.color = RCOLOR[ev.rating];
+    $('ratingSub').textContent = ev.final ? `${r0(tot.k)} kcal eaten` : `${r0(tot.k)} kcal eaten · full check after 9 pm`;
+    const left = Math.max(0, t.k - tot.k);
+    let html = ev.bad.map(b => `<li>⚠️<span>${esc(b)}</span></li>`).join('') +
+               ev.good.map(g => `<li>✅<span>${esc(g)}</span></li>`).join('');
+    if (!ev.final) {
+      const hints = [];
+      if (tot.p < t.p) hints.push(`${r0(t.p - tot.p)} g protein`);
+      if (tot.vg < t.vg) hints.push(`~${r0(t.vg - tot.vg)} g vegetables`);
+      if (tot.fg < t.fg) hints.push(`a fruit`);
+      if (tot.fb < t.fb) hints.push(`${r0(t.fb - tot.fb)} g fibre`);
+      html += `<li>💡<span>Still to go: ${left ? r0(left) + ' kcal' : 'calories done'}${hints.length ? ' · ' + hints.join(', ') : ''}</span></li>`;
+    }
+    $('issues').innerHTML = html;
+  } else {
+    $('scoreNum').textContent = '–';
+    $('ring').style.background = 'var(--none)';
+    $('ratingTxt').textContent = 'Nothing logged yet'; $('ratingTxt').style.color = 'var(--text)';
+    $('ratingSub').textContent = `Your target: ${t.k} kcal`;
+    $('issues').innerHTML = '';
+  }
+
+  // bars
+  $('bars').innerHTML =
+    bar('🔥 Calories', tot.k, t.k, 'kcal', 'range') +
+    bar('💪 Protein', tot.p, t.p, 'g', 'goal') +
+    bar('🌾 Carbs', tot.c, t.c, 'g', 'range') +
+    bar('🧈 Fat', tot.f, t.fatMax, 'g', 'limit') +
+    bar('🥦 Fibre', tot.fb, t.fb, 'g', 'goal') +
+    bar('🥕 Vegetables', tot.vg, t.vg, 'g', 'goal') +
+    bar('🍌 Fruit', tot.fg, t.fg, 'g', 'goal') +
+    bar('🍬 Added sugar', tot.s, t.s, 'g', 'limit') +
+    bar('🧂 Sodium (salt)', tot.na, t.na, 'mg', 'limit');
+
+  // water
+  const w = d ? d.water || 0 : 0;
+  $('waterTxt').textContent = `${w} / ${t.water} glasses`;
+  $('water').innerHTML = Array.from({length: Math.max(t.water, w)}, (_, i) => `<div class="glass ${i < w ? 'on' : ''}"></div>`).join('');
+
+  // meals: eaten + planned-not-yet-eaten
+  $('meals').innerHTML = MEALS.map(([m, label]) => {
+    const eaten = d ? d.meals[m] : [];
+    const et = totals(eaten);
+    const eatenIds = new Set(eaten.map(x => x.id));
+    const planned = (S.plan[m] || []).filter(x => !eatenIds.has(x.id) && food(x.id));
+    const rows = eaten.map((it, i) => { const fd = food(it.id); if (!fd) return '';
+      return `<div class="item"><div class="nm"><div>${esc(fd.n)}${fd.j ? '<span class="tag j">junk</span>' : ''}</div>
+        <div class="small muted">${fmtQ(it.q)} × ${esc(fd.sv)} · ${r0(fd.k*it.q)} kcal · ${r1(fd.p*it.q)} g protein</div></div>
+        <button class="iconbtn" onclick="changeQ('${m}',${i},-0.5)">−</button><button class="iconbtn" onclick="changeQ('${m}',${i},0.5)">+</button>
+        <button class="iconbtn" onclick="removeItem('${m}',${i})">🗑</button></div>`; }).join('');
+    const prow = planned.map(it => { const fd = food(it.id);
+      return `<div class="item planned"><div class="nm"><div>${esc(fd.n)}<span class="tag p">plan</span></div>
+        <div class="small muted">${fmtQ(it.q)} × ${esc(fd.sv)} · ${r0(fd.k*it.q)} kcal</div></div>
+        <button class="iconbtn ok" onclick="atePlanned('${m}','${it.id}',${it.q})">✓ Ate</button></div>`; }).join('');
+    return `<div class="card meal"><h3><span>${label} <span class="small muted">${et.n ? r0(et.k) + ' kcal' : ''}</span></span>
+      <button class="btn sm" onclick="openAdd('day','${m}')">+ Add</button></h3>${rows}${prow}
+      ${!rows && !prow ? '<div class="small muted">Nothing yet</div>' : ''}</div>`;
+  }).join('');
+}
+
+window.changeQ = (m, i, dq) => { const d = day(cur); const it = d.meals[m][i]; it.q = Math.max(0.5, it.q + dq); save(); renderAll(); };
+window.removeItem = (m, i) => { day(cur).meals[m].splice(i, 1); save(); renderAll(); };
+window.atePlanned = (m, id, q) => { day(cur, true).meals[m].push({id, q}); save(); renderAll(); };
+
+/* ======================= RENDER: PLAN ======================= */
+function renderPlan() {
+  const t = T(), all = MEALS.flatMap(([m]) => S.plan[m]), tot = totals(all);
+  $('planTotals').innerHTML = all.length ? `
+    <table>
+      <tr><td>Calories</td><td>${r0(tot.k)} / ${t.k} kcal</td></tr>
+      <tr><td>Protein</td><td>${r0(tot.p)} / ${t.p} g</td></tr>
+      <tr><td>Fibre</td><td>${r0(tot.fb)} / ${t.fb} g</td></tr>
+      <tr><td>Vegetables · Fruit</td><td>${r0(tot.vg)} g · ${r0(tot.fg)} g</td></tr>
+      <tr><td>Fat · Added sugar · Sodium</td><td>${r0(tot.f)} g · ${r0(tot.s)} g · ${r0(tot.na)} mg</td></tr>
+    </table>${tot.na > t.na ? `<div class="tip">🧂 Home-cooked food usually has more salt than the 5 g/day limit. Cook these dishes with light salt, and skip pickle, papad and salted chaas to stay under ${t.na} mg.</div>` : ''}` : '<p class="small muted">No plan yet. Tap “Suggest a healthy plan” to get one built for your targets, then change anything you like.</p>';
+  $('planMeals').innerHTML = MEALS.map(([m, label]) => {
+    const rows = S.plan[m].map((it, i) => { const fd = food(it.id); if (!fd) return '';
+      return `<div class="item"><div class="nm"><div>${esc(fd.n)}</div>
+        <div class="small muted">${fmtQ(it.q)} × ${esc(fd.sv)} · ${r0(fd.k*it.q)} kcal · ${r1(fd.p*it.q)} g protein</div></div>
+        <button class="iconbtn" onclick="planQ('${m}',${i},-0.5)">−</button><button class="iconbtn" onclick="planQ('${m}',${i},0.5)">+</button>
+        <button class="iconbtn" onclick="planDel('${m}',${i})">🗑</button></div>`; }).join('');
+    return `<div class="card meal"><h3><span>${label} <span class="small muted">${S.plan[m].length ? r0(totals(S.plan[m]).k) + ' kcal' : ''}</span></span>
+      <button class="btn sm" onclick="openAdd('plan','${m}')">+ Add</button></h3>${rows || '<div class="small muted">Nothing planned</div>'}</div>`;
+  }).join('');
+}
+window.planQ = (m, i, dq) => { const it = S.plan[m][i]; it.q = Math.max(0.5, it.q + dq); save(); renderAll(); };
+window.planDel = (m, i) => { S.plan[m].splice(i, 1); save(); renderAll(); };
+
+// Balanced Indian day templates (ICMR "My Plate" style), scaled to your calories.
+const TEMPLATES = [
+  { breakfast:[['besan-chilla',2],['curd-dahi',1],['papaya',1]],
+    lunch:[['roti-chapati-no-ghee',2],['dal-toor-moong-plain',1],['mixed-veg-sabzi',1],['green-salad-cucumber-tomato-onion-carrot',1],['buttermilk-chaas',1]],
+    snacks:[['roasted-chana',1],['tea-with-milk-no-sugar',1],['almonds',1]],
+    dinner:[['roti-chapati-no-ghee',2],['palak-paneer',1],['lauki-tori-tinda-sabzi',1]] },
+  { breakfast:[['poha',1],['moong-sprouts-salad',1],['guava',1]],
+    lunch:[['brown-rice-cooked',1],['rajma-curry',1],['bhindi-sabzi',1],['green-salad-cucumber-tomato-onion-carrot',1],['curd-dahi',1]],
+    snacks:[['roasted-makhana',1],['tea-with-milk-no-sugar',1],['walnuts',1],['apple',1]],
+    dinner:[['jowar-roti',2],['dal-toor-moong-plain',1],['gobi-cabbage-sabzi',1],['vegetable-soup',1]] },
+  { breakfast:[['idli',3],['sambar',1],['orange-mosambi',1]],
+    lunch:[['roti-chapati-no-ghee',2],['chole',1],['palak-saag',1],['veg-raita',1],['green-salad-cucumber-tomato-onion-carrot',1]],
+    snacks:[['peanuts-roasted',1],['buttermilk-chaas',1],['banana',1]],
+    dinner:[['vegetable-daliya',1],['paneer-plain',1],['boiled-steamed-vegetables',1]] },
+];
+const GRAIN_IDS = new Set(['roti-chapati-no-ghee','brown-rice-cooked','jowar-roti','vegetable-daliya','poha','idli']);
+function suggestPlan() {
+  const p = S.profile || {diet:'v'}, t = T();
+  const di = Math.floor(today() / 864e5) % TEMPLATES.length;
+  const tpl = JSON.parse(JSON.stringify(TEMPLATES[(di + (S.suggestN = (S.suggestN||0) + 1)) % TEMPLATES.length]));
+  if (p.diet === 'e' || p.diet === 'n') tpl.breakfast = [['omelette-2-eggs',1],['brown-whole-wheat-bread',2],['orange-mosambi',1]];
+  if (p.diet === 'n') tpl.dinner = tpl.dinner.map(([id,q]) => ['paneer-plain','palak-paneer','dal-toor-moong-plain'].includes(id) ? (S.suggestN % 2 ? ['chicken-curry',1] : ['fish-curry',1]) : [id,q]);
+  const plan = {}; MEALS.forEach(([m]) => plan[m] = tpl[m].map(([id,q]) => ({id,q})));
+  // scale grain portions to reach your calorie target
+  const all = MEALS.flatMap(([m]) => plan[m]);
+  const grain = totals(all.filter(x => GRAIN_IDS.has(x.id))).k, rest = totals(all.filter(x => !GRAIN_IDS.has(x.id))).k;
+  const f = grain ? Math.min(1.5, Math.max(0.5, (t.k - rest) / grain)) : 1;   // at most ~3 rotis per meal
+  all.forEach(x => { if (GRAIN_IDS.has(x.id)) x.q = Math.max(0.5, Math.round(x.q * f * 2) / 2); });
+  // still short on calories? add wholesome extras instead of piling on more grains
+  const extras = [['snacks','milk-toned-no-sugar',1],['snacks','peanuts-roasted',1],['breakfast','banana',1],
+                  ['dinner','curd-dahi',1],['snacks','mixed-nuts',1],['lunch','roti-chapati-no-ghee',1],['dinner','roti-chapati-no-ghee',1]];
+  for (const [m, id, q] of extras) {
+    const now = totals(MEALS.flatMap(([mm]) => plan[mm])).k;
+    if (t.k - now < 120) break;
+    const ex = plan[m].find(x => x.id === id);
+    if (ex) ex.q += q; else plan[m].push({id, q});
+  }
+  // top up protein with curd / sprouts if still short
+  // over the calorie target (smaller appetites / fat-loss)? trim optional extras, keep veg, dal & fruit
+  const trims = [['snacks','roasted-makhana'],['snacks','walnuts'],['snacks','almonds'],['snacks','peanuts-roasted'],
+                 ['snacks','roasted-chana'],['breakfast','brown-whole-wheat-bread'],['lunch','curd-dahi'],['lunch','veg-raita'],
+                 ['lunch','buttermilk-chaas'],['snacks','buttermilk-chaas'],['breakfast','curd-dahi'],['breakfast','besan-chilla']];
+  for (const [m, id] of trims) {
+    if (totals(MEALS.flatMap(([mm]) => plan[mm])).k - t.k < 80) break;
+    const i = plan[m].findIndex(x => x.id === id); if (i < 0) continue;
+    if (plan[m][i].q > 1) plan[m][i].q -= 1; else plan[m].splice(i, 1);
+  }
+  let tp = totals(MEALS.flatMap(([mm]) => plan[mm])).p;
+  if (tp < t.p * 0.9) { plan.snacks.push({id:'greek-yogurt-hung-curd', q:1}); tp += 9; }
+  if (tp < t.p * 0.9) { plan.lunch.push({id: p.diet === 'v' ? 'moong-sprouts-salad' : 'boiled-egg', q: p.diet === 'v' ? 1 : 2}); }
+  S.plan = plan; save(); renderAll();
+}
+
+/* ======================= RENDER: HISTORY ======================= */
+function renderHistory() {
+  $('mLabel').textContent = calView.toLocaleDateString(undefined, {month:'long', year:'numeric'});
+  const first = (calView.getDay() + 6) % 7, n = new Date(calView.getFullYear(), calView.getMonth()+1, 0).getDate();
+  const tk = keyOf(today());
+  let html = ['M','T','W','T','F','S','S'].map(x => `<div class="dow">${x}</div>`).join('');
+  for (let i = 0; i < first; i++) html += '<div class="d e"></div>';
+  for (let i = 1; i <= n; i++) {
+    const k = keyOf(new Date(calView.getFullYear(), calView.getMonth(), i)), ev = evaluate(k);
+    const cls = !ev ? '' : (k === tk && !ev.final) ? 'prog' : ev.rating;
+    html += `<div class="d ${cls} ${k === tk ? 'today' : ''}" onclick="openDay('${k}')">${i}</div>`;
+  }
+  $('cal').innerHTML = html;
+
+  // last 7 days summary
+  const evs = []; const cnt = {};
+  for (let i = 1; i <= 7; i++) { const dd = today(); dd.setDate(dd.getDate() - i); const ev = evaluate(keyOf(dd)); if (ev) { evs.push(ev); ev.bad.forEach(b => { const key = b.split(/[:—]/)[0].replace(/\d+ servings of/, 'Fried/junk/sweets').trim(); cnt[key] = (cnt[key]||0) + 1; }); } }
+  if (!evs.length) { $('weekCard').innerHTML = '<h3>📊 Last 7 days</h3><p class="small muted">Log a few days of meals to see your weekly report.</p>'; return; }
+  const avg = f => evs.reduce((a, e) => a + e.tot[f], 0) / evs.length, t = T();
+  const c = {good:0, ok:0, bad:0}; evs.forEach(e => c[e.rating]++);
+  const top = Object.entries(cnt).sort((a,b) => b[1]-a[1]).slice(0,3);
+  $('weekCard').innerHTML = `<h3>📊 Last 7 days (${evs.length} logged)</h3>
+    <p class="small">💚 ${c.good} healthy · 🟠 ${c.ok} okay · 🔴 ${c.bad} unhealthy · avg score <b>${r0(evs.reduce((a,e)=>a+e.s,0)/evs.length)}</b></p>
+    <table><tr><td>Avg calories</td><td>${r0(avg('k'))} / ${t.k}</td></tr><tr><td>Avg protein</td><td>${r0(avg('p'))} / ${t.p} g</td></tr>
+    <tr><td>Avg fibre</td><td>${r0(avg('fb'))} / ${t.fb} g</td></tr><tr><td>Avg vegetables</td><td>${r0(avg('vg'))} / ${t.vg} g</td></tr>
+    <tr><td>Avg added sugar</td><td>${r0(avg('s'))} / ${t.s} g</td></tr><tr><td>Avg sodium</td><td>${r0(avg('na'))} / ${t.na} mg</td></tr></table>
+    ${top.length ? '<h3 style="margin-top:12px">🎯 Fix these first</h3>' + top.map(([k,v]) => `<div class="tip">${esc(k)} — ${v} of ${evs.length} days</div>`).join('') : ''}`;
+}
+window.openDay = k => { cur = k; showTab('today'); };
+
+/* ======================= RENDER: PROFILE ======================= */
+function loadProfile() {
+  const p = S.profile || {sex:'m', age:'', ht:'', wt:'', act:1.55, goal:'keep', diet:'v'};
+  $('pSex').value = p.sex; $('pAge').value = p.age; $('pHt').value = p.ht; $('pWt').value = p.wt;
+  $('pAct').value = String(p.act); $('pGoal').value = p.goal; $('pDiet').value = p.diet;
+}
+function renderTargets() {
+  if (!S.profile) { $('targetCard').innerHTML = '<h3>🎯 Your ideal daily amounts</h3><p class="small muted">Fill in the form above to see them.</p>'; return; }
+  const t = T(), p = S.profile, bmi = p.wt / ((p.ht/100) ** 2);
+  const bmiTxt = bmi < 18.5 ? 'underweight' : bmi < 23 ? 'healthy range (Asian cut-off)' : bmi < 25 ? 'overweight (Asian cut-off)' : 'obese range (Asian cut-off)';
+  $('targetCard').innerHTML = `<h3>🎯 Your ideal daily amounts</h3>
+    <table>
+      <tr><td>🔥 Calories</td><td>${t.k} kcal</td></tr>
+      <tr><td>💪 Protein</td><td>${t.p} g</td></tr>
+      <tr><td>🌾 Carbohydrates</td><td>~${t.c} g</td></tr>
+      <tr><td>🧈 Fat</td><td>~${t.f} g (max ${t.fatMax} g)</td></tr>
+      <tr><td>🥦 Fibre</td><td>${t.fb} g or more</td></tr>
+      <tr><td>🥕 Vegetables</td><td>${t.vg} g or more (~3 katoris)</td></tr>
+      <tr><td>🍌 Fruit</td><td>${t.fg} g or more (1 fruit)</td></tr>
+      <tr><td>🍬 Added sugar</td><td>under ${t.s} g (~${Math.round(t.s/5)} tsp)</td></tr>
+      <tr><td>🧂 Salt</td><td>under 5 g (1 tsp) = ${t.na} mg sodium</td></tr>
+      <tr><td>💧 Water</td><td>${t.water} glasses</td></tr>
+    </table>
+    <p class="small muted">BMI ${r1(bmi)} — ${bmiTxt}. Maintenance ≈ ${t.tdee} kcal/day${p.goal==='lose' ? '; you eat ~400 less to lose about ⅓ kg a week' : p.goal==='gain' ? '; you eat ~300 more to support muscle gain with your gym training' : ''}.</p>
+    <div class="tip">🍽️ ICMR plate rule: half the plate vegetables + fruit, a quarter whole grains/millets, a quarter dal/paneer/curd${p.diet!=='v' ? '/egg' : ''}${p.diet==='n' ? '/chicken/fish' : ''}. Limit fried food, sweets, packaged snacks and sugary drinks.</div>`;
+}
+$('saveProfile').onclick = () => {
+  const p = {sex:$('pSex').value, age:+$('pAge').value, ht:+$('pHt').value, wt:+$('pWt').value,
+             act:+$('pAct').value, goal:$('pGoal').value, diet:$('pDiet').value};
+  if (!(p.age >= 14 && p.age <= 100 && p.ht >= 120 && p.ht <= 230 && p.wt >= 30 && p.wt <= 250)) {
+    $('targetCard').innerHTML = '<p style="color:var(--bad)">Please enter a valid age, height (cm) and weight (kg).</p>'; return; }
+  S.profile = p; save(); renderAll();
+  $('targetCard').scrollIntoView({behavior:'smooth'});
+};
+
+/* ======================= ADD-FOOD SHEET ======================= */
+let addMode = 'day', addMeal = 'breakfast', addGroup = 'All', picked = null, pickQ = 1;
+window.openAdd = (mode, meal) => {
+  addMode = mode; addMeal = meal; addGroup = 'All'; $('search').value = '';
+  $('sheetTitle').textContent = mode === 'plan' ? 'Add to plan' : 'Add what you ate';
+  showView('pickView'); renderPicker();
+  $('sheet').classList.add('on'); $('sheetBg').classList.add('on');
+};
+function closeSheet() { $('sheet').classList.remove('on'); $('sheetBg').classList.remove('on'); }
+function showView(v) { ['pickView','qtyView','customView'].forEach(x => $(x).style.display = x === v ? 'flex' : 'none'); }
+function renderPicker() {
+  $('mealChips').innerHTML = MEALS.map(([m, l]) => `<div class="chip ${m === addMeal ? 'on' : ''}" onclick="setMeal('${m}')">${l}</div>`).join('');
+  $('groupChips').innerHTML = GROUPS.map(g => `<div class="chip ${g === addGroup ? 'on' : ''}" onclick="setGroup('${g}')">${g}</div>`).join('');
+  const q = $('search').value.trim().toLowerCase(), diet = S.profile ? S.profile.diet : 'n';
+  const okDiet = f => diet === 'n' || f.d === 'v' || (diet === 'e' && f.d === 'e');
+  let list = [...Object.values(FOODS), ...S.custom.map(c => Object.assign({g:'My foods'}, c))].filter(okDiet);
+  if (addGroup !== 'All') list = list.filter(f => f.g === addGroup);
+  if (q) list = list.filter(f => q.split(/\s+/).every(w => f.n.toLowerCase().includes(w)));
+  else if (addGroup === 'All') { // recent first
+    const rec = S.recent.map(food).filter(Boolean).filter(okDiet);
+    list = [...rec, ...list.filter(f => !S.recent.includes(f.id))];
+  }
+  $('results').innerHTML = list.slice(0, 80).map(f => `<div class="res" onclick="pick('${f.id}')">
+     <div>${esc(f.n)}${f.j ? '<span class="tag j">junk</span>' : ''}<div class="small muted">${esc(f.sv)}</div></div>
+     <div class="small" style="text-align:right;flex:none">${r0(f.k)} kcal<div class="muted">${r1(f.p)} g protein</div></div></div>`).join('')
+     || '<p class="small muted">No match — try another word, or add your own food below.</p>';
+}
+window.setMeal = m => { addMeal = m; renderPicker(); };
+window.setGroup = g => { addGroup = g; renderPicker(); };
+window.pick = id => { picked = food(id); pickQ = 1; showView('qtyView'); renderQty(); };
+function renderQty() {
+  const f = picked, q = pickQ;
+  $('qName').textContent = f.n; $('qServing').textContent = `1 serving = ${f.sv}`; $('qVal').textContent = fmtQ(q);
+  $('qInfo').innerHTML = `<table>
+    <tr><td>Calories</td><td>${r0(f.k*q)} kcal</td></tr><tr><td>Protein</td><td>${r1(f.p*q)} g</td></tr>
+    <tr><td>Carbs · Fat</td><td>${r0(f.c*q)} g · ${r0(f.f*q)} g</td></tr><tr><td>Fibre</td><td>${r1(f.fb*q)} g</td></tr>
+    <tr><td>Added sugar · Sodium</td><td>${r0(f.s*q)} g · ${r0(f.na*q)} mg</td></tr></table>`;
+  $('qAdd').textContent = `Add to ${MEALS.find(m => m[0] === addMeal)[1]}`;
+}
+$('qMinus').onclick = () => { pickQ = Math.max(0.5, pickQ - 0.5); renderQty(); };
+$('qPlus').onclick = () => { pickQ += 0.5; renderQty(); };
+$('qBack').onclick = () => showView('pickView');
+$('qAdd').onclick = () => {
+  const it = {id: picked.id, q: pickQ};
+  if (addMode === 'plan') S.plan[addMeal].push(it); else day(cur, true).meals[addMeal].push(it);
+  S.recent = [picked.id, ...S.recent.filter(x => x !== picked.id)].slice(0, 12);
+  save(); closeSheet(); renderAll();
+};
+$('customBtn').onclick = () => { showView('customView'); $('cName').value = $('search').value; };
+$('cBack').onclick = () => showView('pickView');
+$('cSave').onclick = () => {
+  const n = $('cName').value.trim(), k = +$('cK').value;
+  if (!n || !(k >= 0) || $('cK').value === '') { $('cName').focus(); return; }
+  const num = id => +$(id).value || 0;
+  const f = {id: 'c' + Date.now(), n, sv: $('cServ').value.trim() || '1 serving', k, p:num('cP'), c:num('cC'), f:num('cF'),
+             fb:num('cFb'), s:num('cS'), na:num('cNa'), vg:num('cVg'), fg:num('cFg'), j: $('cJ').checked ? 1 : 0, d:'v', g:'My foods'};
+  S.custom.push(f); save(); pick(f.id);
+  ['cName','cServ','cK','cP','cC','cF','cFb','cS','cNa','cVg','cFg'].forEach(x => $(x).value = ''); $('cJ').checked = false;
+};
+$('search').oninput = renderPicker;
+$('closeSheet').onclick = closeSheet; $('sheetBg').onclick = closeSheet;
+
+/* ======================= NAV & WIRING ======================= */
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 'tab-' + name));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  renderAll(); window.scrollTo(0, 0);
+}
+window.showTab = showTab;
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+$('dPrev').onclick = () => { const d = parseKey(cur); d.setDate(d.getDate() - 1); cur = keyOf(d); renderAll(); };
+$('dNext').onclick = () => { const d = parseKey(cur); d.setDate(d.getDate() + 1); cur = keyOf(d); renderAll(); };
+$('mPrev').onclick = () => { calView.setMonth(calView.getMonth() - 1); renderHistory(); };
+$('mNext').onclick = () => { calView.setMonth(calView.getMonth() + 1); renderHistory(); };
+$('wPlus').onclick = () => { day(cur, true).water++; save(); renderAll(); };
+$('wMinus').onclick = () => { const d = day(cur, true); d.water = Math.max(0, d.water - 1); save(); renderAll(); };
+$('suggestBtn').onclick = suggestPlan;
+$('clearPlan').onclick = () => { MEALS.forEach(([m]) => S.plan[m] = []); save(); renderAll(); };
+$('exportBtn').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 1)], {type:'application/json'}));
+  a.download = `food-tracker-backup-${keyOf(today())}.json`; a.click();
+};
+$('importBtn').onclick = () => $('importFile').click();
+$('importFile').onchange = e => { const f = e.target.files[0]; if (!f) return;
+  f.text().then(t => { try { const imp = JSON.parse(t); if (imp && imp.days) { S = Object.assign(S, imp); save(); loadProfile(); renderAll(); } } catch (err) {} }); };
+
+function renderAll() { renderToday(); renderPlan(); renderHistory(); renderTargets(); }
+loadProfile(); renderAll();
+if (!S.profile) showTab('profile');
+
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>
