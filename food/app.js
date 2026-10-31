@@ -102,7 +102,7 @@ function targets(p) {
   const carbs = Math.round((k - protein*4 - fat*9) / 4);
   return {k, p:protein, c:carbs, f:fat, fatMax:Math.round(k*0.30/9), fb:Math.max(25, Math.round(k/1000*15)),
           s:(p.cond && p.cond.dm) ? 10 : Math.round(k*0.05/4), na:(p.cond && p.cond.bp) ? 1500 : 2000, vg:400, fg:100, fe:p.sex === 'f' && p.age < 50 ? 29 : 19, ca:1000, vc:p.sex === 'f' ? 65 : 80,
-          water:Math.max(8, Math.round(p.wt*35/250)), tdee:Math.round(tdee)};
+          water:Math.min(12, Math.max(8, Math.round(p.wt*35/250))), tdee:Math.round(tdee)};
 }
 const T = () => targets(S.profile);
 
