@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Gym & Run Tracker</title>
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --line:#334155; --text:#e2e8f0; --muted:#94a3b8;
+    --gym:#f97316; --run:#22c55e; --today:#38bdf8;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);
+       padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+  main{max-width:480px;margin:0 auto;padding:16px}
+  h1{font-size:1.25rem;margin:4px 0 16px;text-align:center}
+  .card{background:var(--card);border-radius:16px;padding:14px;margin-bottom:14px}
+  .today-label{color:var(--muted);font-size:.85rem;margin-bottom:10px;text-align:center}
+  .quick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btn{border:2px solid var(--line);background:transparent;color:var(--text);border-radius:14px;padding:14px 8px;
+       font-size:1rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn.gym.on{background:var(--gym);border-color:var(--gym);color:#111}
+  .btn.run.on{background:var(--run);border-color:var(--run);color:#111}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+  .stat b{display:block;font-size:1.4rem}
+  .stat span{font-size:.75rem;color:var(--muted)}
+  .stat.gym b{color:var(--gym)} .stat.run b{color:var(--run)}
+  .nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .nav button{background:var(--line);border:0;color:var(--text);width:38px;height:38px;border-radius:10px;font-size:1.1rem;cursor:pointer}
+  .nav h2{font-size:1rem;margin:0}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .dow{text-align:center;font-size:.7rem;color:var(--muted);padding-bottom:4px}
+  .day{aspect-ratio:1;border-radius:10px;background:#0f172a;border:1px solid transparent;display:flex;flex-direction:column;
+       align-items:center;justify-content:center;gap:3px;font-size:.85rem;cursor:pointer;user-select:none}
+  .day.empty{background:transparent;cursor:default}
+  .day.today{border-color:var(--today)}
+  .day.future{opacity:.35}
+  .day.sel{outline:2px solid var(--text)}
+  .dots{display:flex;gap:3px;height:8px}
+  .dot{width:8px;height:8px;border-radius:50%}
+  .dot.g{background:var(--gym)} .dot.r{background:var(--run)}
+  .legend{display:flex;gap:14px;justify-content:center;font-size:.75rem;color:var(--muted);margin-top:10px}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+  .small{font-size:.75rem;color:var(--muted);text-align:center}
+  .row{display:flex;gap:8px;justify-content:center;margin-top:8px}
+  .link{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:6px 10px;font-size:.8rem;cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+  <h1>🏋️ Gym &amp; 🏃 Run Tracker</h1>
+
+  <section class="card">
+    <div class="today-label" id="selLabel"></div>
+    <div class="quick">
+      <button class="btn gym" id="gymBtn">🏋️ Gym</button>
+      <button class="btn run" id="runBtn">🏃 Run</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="nav">
+      <button id="prev" aria-label="Previous month">‹</button>
+      <h2 id="monthTitle"></h2>
+      <button id="next" aria-label="Next month">›</button>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="legend"><span><i style="background:var(--gym)"></i>Gym</span><span><i style="background:var(--run)"></i>Run</span></div>
+  </section>
+
+  <section class="card">
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <section class="card">
+    <div class="small">Tap any day in the calendar to select it, then tap Gym or Run.<br>Data is saved on this device.</div>
+    <div class="row">
+      <button class="link" id="exportBtn">Export backup</button>
+      <button class="link" id="importBtn">Import backup</button>
+      <input type="file" id="importFile" accept="application/json" hidden>
+    </div>
+  </section>
+</main>
+
+<script>
+const KEY = 'gymRunTracker.v1';
+let data = {};
+try { data = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { data = {}; }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
+
+const pad = n => String(n).padStart(2, '0');
+const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = new Date(); today.setHours(0,0,0,0);
+const todayKey = keyOf(today);
+
+let selected = todayKey;
+let view = new Date(today.getFullYear(), today.getMonth(), 1);
+
+const $ = id => document.getElementById(id);
+
+function toggle(type) {
+  const e = data[selected] || {};
+  e[type] = !e[type];
+  if (!e.gym && !e.run) delete data[selected]; else data[selected] = e;
+  save(); render();
+}
+
+function streak(type) {
+  // consecutive days ending today (or yesterday if today not done yet)
+  let d = new Date(today), n = 0;
+  if (!(data[keyOf(d)] || {})[type]) d.setDate(d.getDate() - 1);
+  while ((data[keyOf(d)] || {})[type]) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+
+function render() {
+  // selected-day panel
+  const [y, m, dd] = selected.split('-').map(Number);
+  const sd = new Date(y, m - 1, dd);
+  $('selLabel').textContent = (selected === todayKey ? 'Today · ' : '') +
+    sd.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+  const se = data[selected] || {};
+  $('gymBtn').classList.toggle('on', !!se.gym);
+  $('runBtn').classList.toggle('on', !!se.run);
+  $('gymBtn').textContent = se.gym ? '🏋️ Gym ✓' : '🏋️ Gym';
+  $('runBtn').textContent = se.run ? '🏃 Run ✓' : '🏃 Run';
+
+  // calendar
+  $('monthTitle').textContent = view.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const grid = $('grid'); grid.innerHTML = '';
+  ['M','T','W','T','F','S','S'].forEach(l => { const c = document.createElement('div'); c.className = 'dow'; c.textContent = l; grid.appendChild(c); });
+  const first = (view.getDay() + 6) % 7; // Monday-first
+  const days = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+  for (let i = 0; i < first; i++) { const c = document.createElement('div'); c.className = 'day empty'; grid.appendChild(c); }
+  let mGym = 0, mRun = 0;
+  for (let d = 1; d <= days; d++) {
+    const date = new Date(view.getFullYear(), view.getMonth(), d);
+    const k = keyOf(date), e = data[k] || {};
+    if (e.gym) mGym++; if (e.run) mRun++;
+    const c = document.createElement('div');
+    c.className = 'day' + (k === todayKey ? ' today' : '') + (date > today ? ' future' : '') + (k === selected ? ' sel' : '');
+    c.innerHTML = `<span>${d}</span><span class="dots">${e.gym ? '<i class="dot g"></i>' : ''}${e.run ? '<i class="dot r"></i>' : ''}</span>`;
+    if (date <= today) c.onclick = () => { selected = k; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    grid.appendChild(c);
+  }
+
+  // stats
+  const all = Object.values(data);
+  $('stats').innerHTML = `
+    <div class="stat gym"><b>${mGym}</b><span>Gym this month</span></div>
+    <div class="stat run"><b>${mRun}</b><span>Runs this month</span></div>
+    <div class="stat"><b>${mGym + mRun === 0 ? 0 : Object.keys(data).filter(k => k.startsWith(keyOf(view).slice(0,7))).length}</b><span>Active days</span></div>
+    <div class="stat gym"><b>${streak('gym')}</b><span>Gym streak</span></div>
+    <div class="stat run"><b>${streak('run')}</b><span>Run streak</span></div>
+    <div class="stat"><b>${all.filter(e => e.gym).length}/${all.filter(e => e.run).length}</b><span>All-time gym/run</span></div>`;
+}
+
+$('gymBtn').onclick = () => toggle('gym');
+$('runBtn').onclick = () => toggle('run');
+$('prev').onclick = () => { view.setMonth(view.getMonth() - 1); render(); };
+$('next').onclick = () => { view.setMonth(view.getMonth() + 1); render(); };
+
+$('exportBtn').onclick = () => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `gym-run-backup-${todayKey}.json`; a.click();
+};
+$('importBtn').onclick = () => $('importFile').click();
+$('importFile').onchange = ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  f.text().then(t => {
+    try { const imp = JSON.parse(t); Object.assign(data, imp); save(); render(); }
+    catch (e) { $('selLabel').textContent = 'That file could not be read.'; }
+  });
+};
+
+render();
+</script>
+</body>
+</html>
